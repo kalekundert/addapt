@@ -3,10 +3,10 @@
 #include <memory>
 #include <vector>
 
-#include "model.hh"
-#include "scoring.hh"
+#include <sgrna_design/model.hh>
+#include <sgrna_design/scoring.hh>
 
-namespace sgrna {
+namespace sgrna_design {
 
 class Move;
 using MovePtr = std::shared_ptr<Move>;
@@ -54,16 +54,17 @@ public:
 	/// @brief Add a move.
 	void add_move(MovePtr);
 
-private:
+	/// @brief Add a move.
+	void operator+=(MovePtr);
 
-	double my_beta;
-	int my_steps;
-	ScoreFunctionPtr my_scorefxn;
-	MoveList my_moves;
+	private:
 
-};
+		double my_beta;
+		int my_steps;
+		ScoreFunctionPtr my_scorefxn;
+		MoveList my_moves;
 
-void operator+=(MonteCarloPtr, MovePtr);
+	};
 
 class Move {
 
@@ -73,13 +74,47 @@ public:
 
 };
 
-//class MakePointMutation
-//
-//public:
-//
-//	void apply(ConstructPtr) const;
-//
-//};
+class DomainMove : public Move {
+
+public:
+
+	DomainMove(std::vector<string>);
+
+	std::vector<string> domain_names() const;
+
+protected:
+
+	string random_domain_name(std::mt19937 &) const;
+
+private:
+
+	std::vector<string> my_domain_names;
+
+};
+
+
+class MakePointMutation : public DomainMove {
+
+public:
+
+	MakePointMutation(std::vector<string>);
+
+	void apply(ConstructPtr, std::mt19937 &) const;
+
+};
+
+class MakeWtReversion : public DomainMove {
+
+public:
+
+	MakeWtReversion(std::vector<string>, ConstructConstPtr);
+
+	void apply(ConstructPtr, std::mt19937 &) const;
+
+private:
+
+	ConstructConstPtr my_wt;
+};
 
 }
 

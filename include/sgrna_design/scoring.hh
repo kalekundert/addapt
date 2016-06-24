@@ -4,13 +4,12 @@
 #include <vector>
 
 extern "C" {
-  #include <ViennaRNA/part_func.h>
-  #include <ViennaRNA/structure_utils.h>
+  #include <ViennaRNA/data_structures.h>
 }
 
-#include "model.hh"
+#include <sgrna_design/model.hh>
 
-namespace sgrna {
+namespace sgrna_design {
 
 class ScoreFunction;
 using ScoreFunctionPtr = std::shared_ptr<ScoreFunction>;
@@ -52,6 +51,8 @@ public:
 	/// @brief Return the probability that these two nucleotides will base pair 
 	/// with each other.
 	double base_pair_prob(Nucleotide, Nucleotide) const;
+	double base_pair_prob(Nucleotide, int) const;
+	double base_pair_prob(int, int) const;
 
 private:
 
@@ -89,28 +90,21 @@ private:
 
 };
 
-class PairedBase : public ScoreTerm {
+class BasePairingTerm : public ScoreTerm {
 
 public:
 
-	PairedBase(double, Nucleotide);
-
-	Nucleotide nuc() const;
-	void nuc(Nucleotide);
-
-	NucleotideList no_lig_partners() const;
-	void no_lig_partner(Nucleotide);
-
-	NucleotideList lig_partners() const;
-	void lig_partner(Nucleotide);
+	BasePairingTerm(
+			vector<string>, vector<string>, vector<string>, double=1.0);
 
 	double evaluate(
 			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
 
 private:
 
-	Nucleotide my_nuc;
-	NucleotideList my_no_lig_partners, my_lig_partners;
+	vector<string> my_selection;
+	vector<string> my_no_lig_targets;
+	vector<string> my_lig_targets;
 
 };
 

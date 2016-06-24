@@ -1,15 +1,10 @@
 #include <boost/format.hpp>
 using boost::format;
 
-#include "model.hh"
-#include "utils.hh"
+#include <sgrna_design/model.hh>
+#include <sgrna_design/utils.hh>
 
-namespace sgrna {
-
-char const *
-Sequence::c_str() const {
-	return seq().c_str();
-}
+namespace sgrna_design {
 
 int
 Sequence::len() const {
@@ -26,7 +21,7 @@ Construct::copy() const {
 
 	// Fill it with copies of my domains.
 	for(DomainPtr domain: my_domains) {
-		construct += domain->copy();
+		*construct += domain->copy();
 	}
 
 	// Return the new construct.
@@ -44,28 +39,81 @@ Construct::seq() const {
 	return seq;
 }
 
-DomainList
+DomainMultiIndex
 Construct::domains() const {
 	return my_domains;
 }
 
+DomainPtr
+Construct::domain(string name) const {
+	auto it = my_domains.get<hash>().find(name);
+	if (it == my_domains.get<hash>().end()) {
+		throw (f("no such domain '%s'") % name).str();
+	}
+	return *it;
+}
+
+DomainPtr
+Construct::operator[](string name) const {
+	return domain(name);
+}
+
+DomainPtr
+Construct::operator[](DomainConstPtr domain) const {
+	return this->domain(domain->name());
+}
+
 void
-Construct::domain(DomainPtr domain) {
+Construct::add_domain(DomainPtr domain) {
 	my_domains.push_back(domain);
+}
+
+void
+Construct::operator+=(DomainPtr domain) {
+	add_domain(domain);
 }
 
 int
 Construct::index(Nucleotide nuc) const {
 	int index = 0;
 
-	for(auto domain : my_domains) {
+	for(DomainConstPtr domain : my_domains) {
 		if (nuc.domain == domain->name()) {
-			return index + nuc.index;
+			return index + nuc.offset;
 		}
 		index += domain->len();
 	}
 
-	throw format("No nucleotide named %s") % nuc.domain;
+	throw (format("No nucleotide named %s") % nuc.domain).str();
+}
+
+int
+Construct::index_5(string name) const {
+	int index = 0;
+
+	for(DomainConstPtr domain : my_domains) {
+		if (name == domain->name()) {
+			return index;
+		}
+		index += domain->len();
+	}
+
+	throw (format("No domain named %s") % name).str();
+}
+
+int
+Construct::index_5(DomainConstPtr domain) const {
+	return index_5(domain->name());
+}
+
+int
+Construct::index_3(string name) const {
+	return index_3(domain(name));
+}
+
+int
+Construct::index_3(DomainConstPtr domain) const {
+	return index_5(domain) + domain->len() - 1;
 }
 
 
@@ -98,6 +146,11 @@ Domain::name(string const name) {
 string
 Domain::seq() const {
 	return my_seq;
+}
+
+char
+Domain::seq(int index) const {
+	return my_seq[index];
 }
 
 void
@@ -145,10 +198,6 @@ Domain::style(StyleEnum style) {
 	my_style = style;
 }
 
-
-void operator+=(ConstructPtr construct, DomainPtr domain) {
-	construct->domain(domain);
-}
 
 std::ostream &operator<<(std::ostream &out, Construct const &construct) {
 	for(DomainPtr domain : construct.domains()) {

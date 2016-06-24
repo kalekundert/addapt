@@ -1,3 +1,5 @@
 *.ps
 build/
 bin/
+tests/run_tests
+a.out

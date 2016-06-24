@@ -1,29 +1,49 @@
-VRNA := /home/kale/research/software/third_party/ViennaRNA-2.2.5
-
-CC := g++
-SRCDIR := src
-BUILDDIR := build
-TARGET := bin/mh
- 
+CXX := g++
 SRCEXT := cc
-SOURCES := $(shell find $(SRCDIR) -type f -name *.$(SRCEXT))
-OBJECTS := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.o))
 CFLAGS := -g -Wall -Werror -std=c++11 -fopenmp
-LIB := -L/home/kale/.local/lib -lRNA -fopenmp
-INC := -isystem /home/kale/.local/include -isystem /usr/include/eigen3
+LIB := -L/home/kale/.local/lib \
+       -L/usr/local/lib64 \
+       -lRNA \
+       -l:libdocopt.a
+INC := -isystem /home/kale/.local/include \
+       -isystem /usr/local/include \
+       -I include
 
-run: $(TARGET)
-	$(TARGET)
+SRC_OBJS := $(patsubst %.cc,build/%.o,$(wildcard src/*.cc))
+TEST_OBJS := $(patsubst %.cc,build/%.o,$(wildcard tests/*.cc))
 
-$(TARGET): $(OBJECTS)
-	$(CC) $^ -o $(TARGET) $(LIB) 
+# Rules for building apps.
 
-$(BUILDDIR)/%.o: $(SRCDIR)/%.$(SRCEXT)
-	@mkdir -p $(BUILDDIR)
-	$(CC) $(CFLAGS) $(INC) -c -o $@ $<
+mh: bin/mh
+	$< -n100 2> bin/mh.log
+
+bin/%: build/apps/%.o $(SRC_OBJS) $(EXTERNAL_OBJS)
+	@mkdir -p bin
+	$(CXX) $(CFLAGS) $^ -o $@ $(LIB)
+
+build/apps/%.o: apps/%.cc
+	@mkdir -p build/apps
+	$(CXX) $(CFLAGS) $(INC) -c -o $@ $<
+
+build/src/%.o: src/%.cc include/sgrna_design/%.hh
+	@mkdir -p build/src
+	$(CXX) $(CFLAGS) $(INC) -c -o $@ $<
+
+# Rules for building tests.
+
+test: tests/run_tests
+	$<
+
+tests/run_tests: $(TEST_OBJS) $(SRC_OBJS)
+	$(CXX) $(CFLAGS) $^ -o $@ $(LIB)
+
+build/tests/%.o: tests/%.cc
+	@mkdir -p build/tests
+	$(CXX) $(CFLAGS) $(INC) -c -o $@ $<
+
+# Clean up.
 
 clean:
-	@echo " Cleaning..."; 
-	$(RM) -r $(BUILDDIR) $(TARGET)
+	$(RM) -r build bin tests/run_tests
 
-.PHONY: clean run
+.PHONY: mh test clean

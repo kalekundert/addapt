@@ -1,8 +1,15 @@
+#include <algorithm>
 #include <cmath>
 
-#include "scoring.hh"
+extern "C" {
+  #include <ViennaRNA/structure_utils.h>
+  #include <ViennaRNA/part_func.h>
+  #include <ViennaRNA/fold.h>
+}
 
-namespace sgrna {
+#include <sgrna_design/scoring.hh>
+
+namespace sgrna_design {
 
 enum class LigandEnum {
 	NONE,
@@ -37,8 +44,8 @@ RnaFold::RnaFold(ConstructPtr sgrna, LigandEnum ligand):
 	my_sgrna(sgrna),
 	my_seq(sgrna->seq()) {
 
-	my_fc = vrna_fold_compound(my_seq.c_str(), NULL, VRNA_OPTION_PF);
-	vrna_exp_params_rescale(my_fc, NULL);
+	my_fc = vrna_fold_compound(
+			my_seq.c_str(), NULL, VRNA_OPTION_MFE | VRNA_OPTION_PF);
 
 	char const *aptamer_seq = NULL;
 	char const *aptamer_fold = NULL;
@@ -59,7 +66,8 @@ RnaFold::RnaFold(ConstructPtr sgrna, LigandEnum ligand):
 	if (aptamer_seq) {
 		//double rt_37 = 1.9858775e-3 * 310;  // kcal/mol at 37°C
 		//double std_conc = 1e6;              // 1M in μM
-		double aptamer_dg = my_fc->exp_params->kT * log(aptamer_kd_uM / 1e6);
+		double kT = my_fc->exp_params->kT / 1000;
+		double aptamer_dg = kT * log(aptamer_kd_uM / 1e6);
 		vrna_sc_add_hi_motif(
 				my_fc, aptamer_seq, aptamer_fold, aptamer_dg, VRNA_OPTION_DEFAULT);
 	}
@@ -75,10 +83,20 @@ RnaFold::~RnaFold() {
 }
 
 double
-RnaFold::base_pair_prob(Nucleotide a, Nucleotide b) const {
-	int i = my_sgrna->index(a);
-	int j = my_sgrna->index(b);
-	return my_fc->exp_matrices->probs[my_fc->iindx[i] - j];
+RnaFold::base_pair_prob(Nucleotide nuc_a, Nucleotide nuc_b) const {
+	return base_pair_prob(my_sgrna->index(nuc_a), my_sgrna->index(nuc_b));
+}
+
+double
+RnaFold::base_pair_prob(Nucleotide nuc_a, int b) const {
+	return base_pair_prob(my_sgrna->index(nuc_a), b);
+}
+
+double
+RnaFold::base_pair_prob(int a, int b) const {
+	int i = std::min(a, b) + 1;
+	int j = std::max(a, b) + 1;
+	return (i != j) ? my_fc->exp_matrices->probs[my_fc->iindx[i] - j] : 0;
 }
 	
 
@@ -97,46 +115,70 @@ ScoreTerm::weight(double weight) {
 }
 
 
-PairedBase::PairedBase(double weight, Nucleotide nuc)
-	: ScoreTerm(weight), my_nuc(nuc) {}
+double
+prob_paired(
+		vector<int> indices_i,
+		vector<int> indices_j,
+		RnaFold const & fold) {
 
-Nucleotide
-PairedBase::nuc() const {
-	return my_nuc;
+	double prob = 0;
+
+	for(int i: indices_i) {
+		for(int j: indices_j) {
+			prob += fold.base_pair_prob(i, j);
+		}
+	}
+
+	return prob;
 }
 
-void
-PairedBase::nuc(Nucleotide nuc) {
-	my_nuc = nuc;
+vector<int>
+domains_to_indices(
+		ConstructConstPtr sgrna,
+		vector<string> domains) {
+
+	vector<int> indices;
+
+	for(string domain: domains) {
+		for(int i = sgrna->index_5(domain); i <= sgrna->index_3(domain); i++) {
+			indices.push_back(i);
+		}
+	}
+
+	return indices;
 }
 
-NucleotideList
-PairedBase::no_lig_partners() const {
-	return my_no_lig_partners;
-}
 
-void
-PairedBase::no_lig_partner(Nucleotide nuc) {
-	my_no_lig_partners.push_back(nuc);
-}
+BasePairingTerm::BasePairingTerm(
+		vector<string> selection,
+		vector<string> no_lig_targets,
+		vector<string> lig_targets,
+		double weight):
 
-NucleotideList
-PairedBase::lig_partners() const {
-	return my_lig_partners;
-}
-
-void
-PairedBase::lig_partner(Nucleotide nuc) {
-	my_lig_partners.push_back(nuc);
-}
+	ScoreTerm(weight),
+	my_selection(selection),
+	my_no_lig_targets(no_lig_targets),
+	my_lig_targets(lig_targets) {}
 
 double
-PairedBase::evaluate(
+BasePairingTerm::evaluate(
 		ConstructConstPtr sgrna,
-		RnaFold const &no_lig,
-		RnaFold const &lig) const {
-	return 0;
+		RnaFold const &no_lig_fold,
+		RnaFold const &lig_fold) const {
+
+	vector<int> sele_indices = domains_to_indices(sgrna, my_selection);
+	vector<int> no_lig_indices = domains_to_indices(sgrna, my_no_lig_targets);
+	vector<int> lig_indices = domains_to_indices(sgrna, my_lig_targets);
+
+	double no_lig_base_pairing = prob_paired(
+			sele_indices, no_lig_indices, no_lig_fold);
+	double lig_base_pairing = prob_paired(
+			sele_indices, lig_indices, lig_fold);
+
+	return no_lig_base_pairing * lig_base_pairing;
+
 }
+
 
 }
 

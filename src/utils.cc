@@ -1,6 +1,6 @@
-#include "utils.hh"
+#include <sgrna_design/utils.hh>
 
-namespace sgrna {
+namespace sgrna_design {
 
 string
 color(

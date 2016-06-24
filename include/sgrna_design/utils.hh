@@ -5,10 +5,11 @@
 
 #include <boost/format.hpp>
 
-namespace sgrna {
+namespace sgrna_design {
 
 using f = boost::format;
 using std::string;
+using std::vector;
 
 enum class ColorEnum {
 	NORMAL = 0,
