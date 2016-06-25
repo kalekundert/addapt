@@ -18,6 +18,37 @@ TEST_CASE("Test domain constructor", "[model]") {
 	CHECK(domain.style() == StyleEnum::BOLD);
 }
 
+TEST_CASE("Test Domain::mutate") {
+	Domain domain("dummy", "AAAA");
+
+	SECTION("indices refer to the right positions") {
+		domain.mutate(0, 'U');
+		CHECK(domain.seq() == "UAAA");
+		domain.mutate(1, 'U');
+		CHECK(domain.seq() == "UUAA");
+		domain.mutate(2, 'U');
+		CHECK(domain.seq() == "UUUA");
+		domain.mutate(3, 'U');
+		CHECK(domain.seq() == "UUUU");
+	}
+
+	SECTION("negative indices count from the back") {
+		domain.mutate(-1, 'U');
+		CHECK(domain.seq() == "AAAU");
+		domain.mutate(-2, 'U');
+		CHECK(domain.seq() == "AAUU");
+		domain.mutate(-3, 'U');
+		CHECK(domain.seq() == "AUUU");
+		domain.mutate(-4, 'U');
+		CHECK(domain.seq() == "UUUU");
+	}
+
+	SECTION("out-of-bounds indices throw exceptions") {
+		CHECK_THROWS(domain.mutate(4, 'U'));
+		CHECK_THROWS(domain.mutate(-5, 'U'));
+	}
+}
+
 TEST_CASE("Test the construct class", "[model]") {
 	Construct rna;
 

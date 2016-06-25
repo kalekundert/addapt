@@ -160,6 +160,19 @@ Domain::seq(string const seq) {
 
 void
 Domain::mutate(int index, char mutation) {
+	// If the user gave a negative index, interpret it as counting backward from 
+	// the end of the sequence.
+	if(index < 0) {
+		index += len();
+	}
+
+	// Make sure the index refers to a position that actually exists in the 
+	// sequence.
+	if(index < 0 || index >= len()) {
+		throw (f("no index %d in domain %s: %s") % index % my_name % *this).str();
+	}
+
+	// Make the indicated point mutation.
 	my_seq[index] = mutation;
 }
 
