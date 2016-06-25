@@ -6,46 +6,63 @@ using namespace std;
 using namespace sgrna_design;
 
 TEST_CASE("Test domain constructor", "[model]") {
-	Domain domain(
+	Domain theo(
 			"aptamer",
 			"GAUACCAGCCGAAAGGCCCUUGGCAGC",
 			ColorEnum::YELLOW,
 			StyleEnum::BOLD);
 
-	CHECK(domain.name() == "aptamer");
-	CHECK(domain.seq() == "GAUACCAGCCGAAAGGCCCUUGGCAGC");
-	CHECK(domain.color() == ColorEnum::YELLOW);
-	CHECK(domain.style() == StyleEnum::BOLD);
+	CHECK(theo.name() == "aptamer");
+	CHECK(theo.seq() == "GAUACCAGCCGAAAGGCCCUUGGCAGC");
+	CHECK(theo.color() == ColorEnum::YELLOW);
+	CHECK(theo.style() == StyleEnum::BOLD);
 }
 
 TEST_CASE("Test Domain::mutate") {
-	Domain domain("dummy", "AAAA");
+	Domain dummy("dummy", "AAAA");
 
-	SECTION("indices refer to the right positions") {
-		domain.mutate(0, 'U');
-		CHECK(domain.seq() == "UAAA");
-		domain.mutate(1, 'U');
-		CHECK(domain.seq() == "UUAA");
-		domain.mutate(2, 'U');
-		CHECK(domain.seq() == "UUUA");
-		domain.mutate(3, 'U');
-		CHECK(domain.seq() == "UUUU");
+	SECTION("positive indices count from the front") {
+		dummy.mutate(0, 'U'); CHECK(dummy.seq() == "UAAA");
+		dummy.mutate(1, 'U'); CHECK(dummy.seq() == "UUAA");
+		dummy.mutate(2, 'U'); CHECK(dummy.seq() == "UUUA");
+		dummy.mutate(3, 'U'); CHECK(dummy.seq() == "UUUU");
 	}
 
 	SECTION("negative indices count from the back") {
-		domain.mutate(-1, 'U');
-		CHECK(domain.seq() == "AAAU");
-		domain.mutate(-2, 'U');
-		CHECK(domain.seq() == "AAUU");
-		domain.mutate(-3, 'U');
-		CHECK(domain.seq() == "AUUU");
-		domain.mutate(-4, 'U');
-		CHECK(domain.seq() == "UUUU");
+		dummy.mutate(-1, 'U'); CHECK(dummy.seq() == "AAAU");
+		dummy.mutate(-2, 'U'); CHECK(dummy.seq() == "AAUU");
+		dummy.mutate(-3, 'U'); CHECK(dummy.seq() == "AUUU");
+		dummy.mutate(-4, 'U'); CHECK(dummy.seq() == "UUUU");
 	}
 
 	SECTION("out-of-bounds indices throw exceptions") {
-		CHECK_THROWS(domain.mutate(4, 'U'));
-		CHECK_THROWS(domain.mutate(-5, 'U'));
+		CHECK_THROWS(dummy.mutate(4, 'U'));
+		CHECK_THROWS(dummy.mutate(-5, 'U'));
+	}
+}
+
+TEST_CASE("Test Domain::insert") {
+	Domain dummy("dummy", "AAAA");
+
+	SECTION("indices refer to positions between nucleotides") {
+		dummy.seq("AAAA"); dummy.insert(0, "U"); CHECK(dummy.seq() == "UAAAA");
+		dummy.seq("AAAA"); dummy.insert(1, "U"); CHECK(dummy.seq() == "AUAAA");
+		dummy.seq("AAAA"); dummy.insert(2, "U"); CHECK(dummy.seq() == "AAUAA");
+		dummy.seq("AAAA"); dummy.insert(3, "U"); CHECK(dummy.seq() == "AAAUA");
+		dummy.seq("AAAA"); dummy.insert(4, "U"); CHECK(dummy.seq() == "AAAAU");
+	}
+
+	SECTION("negative indices count from the back") {
+		dummy.seq("AAAA"); dummy.insert(-1, "U"); CHECK(dummy.seq() == "AAAAU");
+		dummy.seq("AAAA"); dummy.insert(-2, "U"); CHECK(dummy.seq() == "AAAUA");
+		dummy.seq("AAAA"); dummy.insert(-3, "U"); CHECK(dummy.seq() == "AAUAA");
+		dummy.seq("AAAA"); dummy.insert(-4, "U"); CHECK(dummy.seq() == "AUAAA");
+		dummy.seq("AAAA"); dummy.insert(-5, "U"); CHECK(dummy.seq() == "UAAAA");
+	}
+
+	SECTION("out-of-bounds indices throw exceptions") {
+		CHECK_THROWS(dummy.insert(5, "U"));
+		CHECK_THROWS(dummy.insert(-6, "U"));
 	}
 }
 

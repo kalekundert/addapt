@@ -73,7 +73,20 @@ Domain::mutate(int index, char mutation) {
 
 void
 Domain::insert(int index, string insert) {
-	my_seq.insert(index + 1, insert);
+	// If the user gave a negative index, interpret it as counting backward from 
+	// the end of the sequence.
+	if(index < 0) {
+		index += len() + 1;
+	}
+
+	// Make sure the index refers to a position that actually exists in the 
+	// sequence.
+	if(index < 0 || index > len()) {
+		throw (f("no index %d in domain %s: %s") % index % my_name % *this).str();
+	}
+
+	// Make the indicated insertion.
+	my_seq.insert(index, insert);
 }
 
 void
