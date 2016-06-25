@@ -19,20 +19,20 @@ TEST_CASE("Test domain constructor", "[model]") {
 }
 
 TEST_CASE("Test Domain::mutate") {
-	Domain dummy("dummy", "AAAA");
+	Domain dummy("dummy");
 
 	SECTION("positive indices count from the front") {
-		dummy.mutate(0, 'U'); CHECK(dummy.seq() == "UAAA");
-		dummy.mutate(1, 'U'); CHECK(dummy.seq() == "UUAA");
-		dummy.mutate(2, 'U'); CHECK(dummy.seq() == "UUUA");
-		dummy.mutate(3, 'U'); CHECK(dummy.seq() == "UUUU");
+		dummy.seq("AAAA"); dummy.mutate(0, 'U'); CHECK(dummy.seq() == "UAAA");
+		dummy.seq("AAAA"); dummy.mutate(1, 'U'); CHECK(dummy.seq() == "AUAA");
+		dummy.seq("AAAA"); dummy.mutate(2, 'U'); CHECK(dummy.seq() == "AAUA");
+		dummy.seq("AAAA"); dummy.mutate(3, 'U'); CHECK(dummy.seq() == "AAAU");
 	}
 
 	SECTION("negative indices count from the back") {
-		dummy.mutate(-1, 'U'); CHECK(dummy.seq() == "AAAU");
-		dummy.mutate(-2, 'U'); CHECK(dummy.seq() == "AAUU");
-		dummy.mutate(-3, 'U'); CHECK(dummy.seq() == "AUUU");
-		dummy.mutate(-4, 'U'); CHECK(dummy.seq() == "UUUU");
+		dummy.seq("AAAA"); dummy.mutate(-1, 'U'); CHECK(dummy.seq() == "AAAU");
+		dummy.seq("AAAA"); dummy.mutate(-2, 'U'); CHECK(dummy.seq() == "AAUA");
+		dummy.seq("AAAA"); dummy.mutate(-3, 'U'); CHECK(dummy.seq() == "AUAA");
+		dummy.seq("AAAA"); dummy.mutate(-4, 'U'); CHECK(dummy.seq() == "UAAA");
 	}
 
 	SECTION("out-of-bounds indices throw exceptions") {
@@ -42,7 +42,7 @@ TEST_CASE("Test Domain::mutate") {
 }
 
 TEST_CASE("Test Domain::insert") {
-	Domain dummy("dummy", "AAAA");
+	Domain dummy("dummy");
 
 	SECTION("indices refer to positions between nucleotides") {
 		dummy.seq("AAAA"); dummy.insert(0, "U"); CHECK(dummy.seq() == "UAAAA");
@@ -63,6 +63,51 @@ TEST_CASE("Test Domain::insert") {
 	SECTION("out-of-bounds indices throw exceptions") {
 		CHECK_THROWS(dummy.insert(5, "U"));
 		CHECK_THROWS(dummy.insert(-6, "U"));
+	}
+}
+
+TEST_CASE("Test Domain::remove") {
+	Domain dummy("dummy");
+
+	SECTION("indices refer to positions between nucleotides") {
+		dummy.seq("ACGU"); dummy.remove(0, 0); CHECK(dummy.seq() == "ACGU");
+		dummy.seq("ACGU"); dummy.remove(0, 1); CHECK(dummy.seq() == "CGU");
+		dummy.seq("ACGU"); dummy.remove(0, 2); CHECK(dummy.seq() == "GU");
+		dummy.seq("ACGU"); dummy.remove(0, 3); CHECK(dummy.seq() == "U");
+		dummy.seq("ACGU"); dummy.remove(0, 4); CHECK(dummy.seq() == "");
+	}
+
+	SECTION("negative indices count from the back") {
+		dummy.seq("ACGU"); dummy.remove(-1, -1); CHECK(dummy.seq() == "ACGU");
+		dummy.seq("ACGU"); dummy.remove(-1, -2); CHECK(dummy.seq() == "ACG");
+		dummy.seq("ACGU"); dummy.remove(-1, -3); CHECK(dummy.seq() == "AC");
+		dummy.seq("ACGU"); dummy.remove(-1, -4); CHECK(dummy.seq() == "A");
+		dummy.seq("ACGU"); dummy.remove(-1, -5); CHECK(dummy.seq() == "");
+	}
+
+	SECTION("positive and negative indices can be mixed") {
+		dummy.seq("ACGU");     dummy.remove(0, -1); CHECK(dummy.seq() == "");
+		dummy.seq("ACnnnnGU"); dummy.remove(0, -1); CHECK(dummy.seq() == "");
+		dummy.seq("ACGU");     dummy.remove(1, -2); CHECK(dummy.seq() == "AU");
+		dummy.seq("ACnnnnGU"); dummy.remove(1, -2); CHECK(dummy.seq() == "AU");
+		dummy.seq("ACGU");     dummy.remove(2, -3); CHECK(dummy.seq() == "ACGU");
+		dummy.seq("ACnnnnGU"); dummy.remove(2, -3); CHECK(dummy.seq() == "ACGU");
+	}
+
+	SECTION("the order of the indices doesn't matter") {
+		dummy.seq("ACGU"); dummy.remove( 1,  3); CHECK(dummy.seq() == "AU");
+		dummy.seq("ACGU"); dummy.remove( 3,  1); CHECK(dummy.seq() == "AU");
+		dummy.seq("ACGU"); dummy.remove(-2, -4); CHECK(dummy.seq() == "AU");
+		dummy.seq("ACGU"); dummy.remove(-4, -2); CHECK(dummy.seq() == "AU");
+		dummy.seq("ACGU"); dummy.remove( 1, -2); CHECK(dummy.seq() == "AU");
+		dummy.seq("ACGU"); dummy.remove(-2,  1); CHECK(dummy.seq() == "AU");
+		dummy.seq("ACGU"); dummy.remove( 3, -4); CHECK(dummy.seq() == "AU");
+		dummy.seq("ACGU"); dummy.remove(-4,  3); CHECK(dummy.seq() == "AU");
+	}
+
+	SECTION("out-of-bounds indices throw exceptions") {
+		CHECK_THROWS(dummy.remove(0, 5));
+		CHECK_THROWS(dummy.remove(-6, 0));
 	}
 }
 

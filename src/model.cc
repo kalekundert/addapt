@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <boost/format.hpp>
 using boost::format;
 
@@ -91,7 +93,30 @@ Domain::insert(int index, string insert) {
 
 void
 Domain::remove(int start, int end) {
-	my_seq.erase(start, end - start);
+	// If the user gave negative indices, interpret them as counting backward 
+	// from the end of the sequence.
+	if(start < 0) {
+		start += len() + 1;
+	}
+	if(end < 0) {
+		end += len() + 1;
+	}
+
+	// Make sure both indices refer to positions that actually exist in the 
+	// sequence.
+	if(start < 0 || start > len()) {
+		throw (f("no index %d in domain %s: %s") % start % my_name % *this).str();
+	}
+	if(end < 0 || end > len()) {
+		throw (f("no index %d in domain %s: %s") % end % my_name % *this).str();
+	}
+
+	// Work out which index is lower and which is higher.
+	int i = std::min(start, end);
+	int j = std::max(start, end);
+
+	// Make the indicated deletion.
+	my_seq.erase(i, j - i);
 }
 
 void
