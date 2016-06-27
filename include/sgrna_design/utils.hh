@@ -2,6 +2,7 @@
 
 #include <string>
 #include <memory>
+#include <utility>
 
 #include <boost/format.hpp>
 
@@ -10,6 +11,7 @@ namespace sgrna_design {
 using f = boost::format;
 using std::string;
 using std::vector;
+using std::pair;
 
 enum class ColorEnum {
 	NORMAL = 0,

@@ -13,6 +13,41 @@ Sequence::len() const {
 	return seq().length();
 }
 
+int
+Sequence::normalize_index(int index, bool between) const {
+	int normalized_index = index;
+
+	// If the user gave a negative index, interpret it as counting backward from 
+	// the end of the sequence.
+	if(index < 0) {
+		normalized_index += len() + between;
+	}
+
+	// Make sure the index refers to a position that actually exists in the 
+	// sequence.  The maximum index is one greater if the index refers to the 
+	// positions between the nucleotides rather than the nucleotides themselves.  
+	if(normalized_index < 0 or normalized_index > len() - (between? 0:1)) {
+		throw (f("no index '%d' in '%s'") % index % seq()).str();
+	}
+
+	// Return the normalized index.
+	return normalized_index;
+}
+
+pair<int,int>
+Sequence::normalize_range(int start, int end) const {
+	// Resolve negative and out-of-bounds indices.
+	start = normalize_index(start, true);
+	end = normalize_index(end, true);
+
+	// Work out which index is lower and which is higher.
+	int normalized_start = std::min(start, end);
+	int normalized_end = std::max(start, end);
+
+	// Return the normalized indices.
+	return {normalized_start, normalized_end};
+}
+
 
 Domain::Domain(
 		string const name,
@@ -57,71 +92,26 @@ Domain::seq(string const seq) {
 
 void
 Domain::mutate(int index, char mutation) {
-	// If the user gave a negative index, interpret it as counting backward from 
-	// the end of the sequence.
-	if(index < 0) {
-		index += len();
-	}
-
-	// Make sure the index refers to a position that actually exists in the 
-	// sequence.
-	if(index < 0 || index >= len()) {
-		throw (f("no index %d in domain %s: %s") % index % my_name % *this).str();
-	}
-
-	// Make the indicated point mutation.
+	index = normalize_index(index);
 	my_seq[index] = mutation;
 }
 
 void
 Domain::insert(int index, string insert) {
-	// If the user gave a negative index, interpret it as counting backward from 
-	// the end of the sequence.
-	if(index < 0) {
-		index += len() + 1;
-	}
-
-	// Make sure the index refers to a position that actually exists in the 
-	// sequence.
-	if(index < 0 || index > len()) {
-		throw (f("no index %d in domain %s: %s") % index % my_name % *this).str();
-	}
-
-	// Make the indicated insertion.
+	index = normalize_index(index, true);
 	my_seq.insert(index, insert);
 }
 
 void
 Domain::remove(int start, int end) {
-	// If the user gave negative indices, interpret them as counting backward 
-	// from the end of the sequence.
-	if(start < 0) {
-		start += len() + 1;
-	}
-	if(end < 0) {
-		end += len() + 1;
-	}
-
-	// Make sure both indices refer to positions that actually exist in the 
-	// sequence.
-	if(start < 0 || start > len()) {
-		throw (f("no index %d in domain %s: %s") % start % my_name % *this).str();
-	}
-	if(end < 0 || end > len()) {
-		throw (f("no index %d in domain %s: %s") % end % my_name % *this).str();
-	}
-
-	// Work out which index is lower and which is higher.
-	int i = std::min(start, end);
-	int j = std::max(start, end);
-
-	// Make the indicated deletion.
-	my_seq.erase(i, j - i);
+	auto indices = normalize_range(start, end);
+	my_seq.erase(indices.first, indices.second - indices.first);
 }
 
 void
 Domain::replace(int start, int end, string insert) {
-	my_seq.replace(start, end - start, insert);
+	auto indices = normalize_range(start, end);
+	my_seq.replace(indices.first, indices.second - indices.first, insert);
 }
 
 ColorEnum
