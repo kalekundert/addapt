@@ -13,6 +13,19 @@ using std::string;
 using std::vector;
 using std::pair;
 
+/// @brief Do the indices refer to the items in the collection themselves, or 
+/// to the spaces between the items?
+enum class IndexEnum {
+	ITEM,
+	BETWEEN,
+};
+
+int
+normalize_index(string, int, IndexEnum);
+
+pair<int,int>
+normalize_range(string, int, int, IndexEnum);
+
 enum class ColorEnum {
 	NORMAL = 0,
 	BLACK = 30,
@@ -31,8 +44,8 @@ enum class StyleEnum {
 	REVERSE = 2,
 };
 
-
-string color(string, ColorEnum, StyleEnum);
+string
+color(string, ColorEnum, StyleEnum);
 
 // weighted_choice?
 

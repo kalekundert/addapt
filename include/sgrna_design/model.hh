@@ -43,12 +43,6 @@ public:
 	/// @brief Return the length of the sequence.
 	int len() const;
 
-protected:
-
-	int normalize_index(int, bool=false) const;
-
-	pair<int,int> normalize_range(int, int) const;
-
 };
 
 class Domain : public Sequence {

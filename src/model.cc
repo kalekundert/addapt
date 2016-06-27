@@ -13,41 +13,6 @@ Sequence::len() const {
 	return seq().length();
 }
 
-int
-Sequence::normalize_index(int index, bool between) const {
-	int normalized_index = index;
-
-	// If the user gave a negative index, interpret it as counting backward from 
-	// the end of the sequence.
-	if(index < 0) {
-		normalized_index += len() + between;
-	}
-
-	// Make sure the index refers to a position that actually exists in the 
-	// sequence.  The maximum index is one greater if the index refers to the 
-	// positions between the nucleotides rather than the nucleotides themselves.  
-	if(normalized_index < 0 or normalized_index > len() - (between? 0:1)) {
-		throw (f("no index '%d' in '%s'") % index % seq()).str();
-	}
-
-	// Return the normalized index.
-	return normalized_index;
-}
-
-pair<int,int>
-Sequence::normalize_range(int start, int end) const {
-	// Resolve negative and out-of-bounds indices.
-	start = normalize_index(start, true);
-	end = normalize_index(end, true);
-
-	// Work out which index is lower and which is higher.
-	int normalized_start = std::min(start, end);
-	int normalized_end = std::max(start, end);
-
-	// Return the normalized indices.
-	return {normalized_start, normalized_end};
-}
-
 
 Domain::Domain(
 		string const name,
@@ -92,25 +57,25 @@ Domain::seq(string const seq) {
 
 void
 Domain::mutate(int index, char mutation) {
-	index = normalize_index(index);
+	index = normalize_index(seq(), index, IndexEnum::ITEM);
 	my_seq[index] = mutation;
 }
 
 void
 Domain::insert(int index, string insert) {
-	index = normalize_index(index, true);
+	index = normalize_index(seq(), index, IndexEnum::BETWEEN);
 	my_seq.insert(index, insert);
 }
 
 void
 Domain::remove(int start, int end) {
-	auto indices = normalize_range(start, end);
+	auto indices = normalize_range(seq(), start, end, IndexEnum::BETWEEN);
 	my_seq.erase(indices.first, indices.second - indices.first);
 }
 
 void
 Domain::replace(int start, int end, string insert) {
-	auto indices = normalize_range(start, end);
+	auto indices = normalize_range(seq(), start, end, IndexEnum::BETWEEN);
 	my_seq.replace(indices.first, indices.second - indices.first, insert);
 }
 

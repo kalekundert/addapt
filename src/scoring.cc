@@ -11,12 +11,6 @@ extern "C" {
 
 namespace sgrna_design {
 
-enum class LigandEnum {
-	NONE,
-	THEO,
-};
-
-
 ScoreFunction::ScoreFunction() {}
 
 void 
@@ -39,7 +33,7 @@ ScoreFunction::evaluate(ConstructPtr sgrna) const {
 }
 
 
-RnaFold::RnaFold(ConstructPtr sgrna, LigandEnum ligand):
+RnaFold::RnaFold(ConstructConstPtr sgrna, LigandEnum ligand):
 
 	my_sgrna(sgrna),
 	my_seq(sgrna->seq()) {
@@ -94,8 +88,10 @@ RnaFold::base_pair_prob(Nucleotide nuc_a, int b) const {
 
 double
 RnaFold::base_pair_prob(int a, int b) const {
-	int i = std::min(a, b) + 1;
-	int j = std::max(a, b) + 1;
+	auto indices = normalize_range(my_seq, a, b, IndexEnum::ITEM);
+	// The ViennaRNA matrices are 1-indexed.
+	int i = indices.first + 1;
+	int j = indices.second + 1;
 	return (i != j) ? my_fc->exp_matrices->probs[my_fc->iindx[i] - j] : 0;
 }
 	

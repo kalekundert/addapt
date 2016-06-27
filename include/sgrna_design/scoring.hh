@@ -18,7 +18,11 @@ class ScoreTerm;
 using ScoreTermPtr = std::shared_ptr<ScoreTerm>;
 using ScoreTermList = std::vector<ScoreTermPtr>;
 
-enum class LigandEnum;
+enum class LigandEnum {
+	NONE,
+	THEO,
+};
+
 
 class ScoreFunction {
 
@@ -43,7 +47,7 @@ class RnaFold {
 public:
 
 	/// @brief Predict how the construct will fold.
-	RnaFold(ConstructPtr, LigandEnum);
+	RnaFold(ConstructConstPtr, LigandEnum=LigandEnum::NONE);
 
 	/// @brief Free the ViennaRNA data structures.
 	~RnaFold();
