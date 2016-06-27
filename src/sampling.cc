@@ -25,7 +25,7 @@ MonteCarlo::apply(ConstructPtr sgrna) const {
 	// Get an initial score.
 	double score = my_scorefxn->evaluate(sgrna);
 
-	for(int i = 0; i <= my_steps; i++) {
+	for(int i = 0; i < my_steps; i++) {
 		// Copy the sgRNA so we can easily undo the move.
 		ConstructPtr trial_sgrna = sgrna->copy();
 
@@ -45,12 +45,19 @@ MonteCarlo::apply(ConstructPtr sgrna) const {
 			score = trial_score;
 		}
 
-		// Print some debugging info.
-		std::cerr << score << '\t' << sgrna->seq() << std::endl;
-
-		if (i % 10 == 0) {
-			std::cout << f("score=%.5f seq=%s") % score % *sgrna << std::endl;
+		// Print a progress bar if the program is running in a TTY.
+		if(isatty(1)) {
+			std::cout << "\033[2K\r" << f("[%d/%d]") % (i + 1) % my_steps;
+			if(i + 1 == my_steps) std::cout << std::endl;
+			else std::cout << std::flush;
 		}
+
+		// Print some debugging info.
+		//std::cerr << score << '\t' << sgrna->seq() << std::endl;
+
+		//if (i % 10 == 0) {
+		//	std::cout << f("score=%.5f seq=%s") % score % *sgrna << std::endl;
+		//}
 	}
 
 	return sgrna;
