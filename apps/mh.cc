@@ -24,18 +24,18 @@ ruler, and the rest of the first hairpin.  The design goal is to only form the
 wildtype nexus and hairpin base pairs when theophylline is bound.
 
 Usage:
-	mh [options]
+  mh [options]
 
 Options:
-	-n --num-moves <num>   [default=100]
-		The number of moves to attempt in the Monte Carlo simulation.  I haven't 
-		yet determined how many moves are required to reach convergence.
+  -n --num-moves <num>   [default=100]
+    The number of moves to attempt in the Monte Carlo simulation.  I haven't 
+    yet determined how many moves are required to reach convergence.
 
-	-v --version
-		Display the version of ``mh`` being used.
+  -v --version
+    Display the version of ``mh`` being used.
 
-	-h --help
-		Display this usage information.
+  -h --help
+    Display this usage information.
 )""";
 
 ConstructPtr
@@ -108,10 +108,9 @@ build_mh_sampler(ConstructPtr wt) {
 	return sampler;
 }
 
-
 int main(int argc, char **argv) {
 	map<string, docopt::value> args = docopt::docopt(
-			USAGE, {argv + 1, argv + argc}, true, "0.0");
+			USAGE+1, {argv + 1, argv + argc}, true, "0.0");
 
 	ConstructPtr mh = build_mh_sgrna();
 	ConstructPtr wt = mh->copy();
@@ -119,7 +118,7 @@ int main(int argc, char **argv) {
 	MonteCarloPtr sampler = build_mh_sampler(wt);
 
 	sampler->scorefxn(scorefxn);
-	sampler->num_steps(args["--num-moves"].asLong());
+	sampler->num_steps(stoi(args["--num-moves"].asString()));
 	mh = sampler->apply(mh);
 
 	cout << f("wt: %1%") % *wt << endl;
