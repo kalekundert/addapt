@@ -1,8 +1,11 @@
 #pragma once
 
-#include <string>
+#include <iostream>
+#include <iterator>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include <boost/format.hpp>
 
@@ -47,6 +50,21 @@ enum class StyleEnum {
 string
 color(string, ColorEnum, StyleEnum);
 
-// weighted_choice?
 
 }
+
+namespace std {
+
+template <typename T>
+ostream& operator<< (ostream& out, const vector<T>& vec) {
+  if ( !vec.empty() ) {
+    out << '[';
+    copy(vec.begin(), vec.end(), ostream_iterator<T>(out, ", "));
+    out << "\b\b]";
+  }
+  return out;
+}
+
+
+}
+
