@@ -5,6 +5,9 @@ if [ $# != 1 ]; then
     exit 1
 fi
 
-echo $1 | RNAfold --noPS --MEA
+FLAGS="--noPS --MEA"
+MOTIF="--motif GAUACCAGCCGAAAGGCCCUUGGCAGC,(...((.(((....)))....))...),-9.22"
+
+echo $1 | RNAfold $FLAGS
 echo
-echo $1 | RNAfold --noPS --MEA --motif 'GAUACCAGCCGAAAGGCCCUUGGCAGC,(...((.(((....)))....))...),-9.22'
+echo $1 | RNAfold $FLAGS $MOTIF
