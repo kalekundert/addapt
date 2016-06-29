@@ -116,6 +116,20 @@ private:
 	ConstructConstPtr my_wt;
 };
 
+class ChangeDomainLength : public Move {
+
+public:
+
+	ChangeDomainLength(string, int, int);
+
+	void apply(ConstructPtr, std::mt19937 &) const;
+
+private:
+
+	string my_domain_name;
+	int my_max_len, my_min_len;
+};
+
 }
 
 

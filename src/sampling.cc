@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
@@ -150,5 +151,43 @@ MakeWtReversion::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 	char wt_acgu = (*my_wt)[random_domain]->seq(random_i);
 	random_domain->mutate(random_i, wt_acgu);
 }
+
+
+ChangeDomainLength::ChangeDomainLength(
+		string domain_name, int min_length, int max_length):
+
+	my_domain_name(domain_name),
+	my_max_len(max_length),
+	my_min_len(min_length) {}
+
+
+void
+ChangeDomainLength::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
+	DomainPtr domain = (*sgrna)[my_domain_name];
+
+	// Either try to increment or decrement the length of the domain by one, 
+	// being careful to keep the length of domain within the prescribed limits.  
+	// Note that the rest of the function is written generally enough to 
+	// accommodate any algorithm for picking random lengths.
+
+	int random_length = std::min(std::max(
+			domain->len() + (std::bernoulli_distribution()(rng) ? 1 : -1),
+			my_min_len), my_max_len);
+
+	// Insert or remove nucleotides as necessary to bring the domain to the 
+	// randomly chosen length.
+
+	while(domain->len() < random_length) {
+		int random_i = std::uniform_int_distribution<>(0, domain->len()-1)(rng);
+		char random_acgu = "ACGU"[std::uniform_int_distribution<>(0, 3)(rng)];
+		domain->insert(random_i, random_acgu);
+	}
+
+	while(domain->len() > random_length) {
+		int random_i = std::uniform_int_distribution<>(0, domain->len()-1)(rng);
+		domain->remove(random_i);
+	}
+}
+
 
 }
