@@ -79,7 +79,14 @@ public:
 
 	/// @brief Insert a new sequence into this domain.
 	/// @details The insertion is made immediately after the given index.
+	void insert(int, char);
+
+	/// @brief Insert a new sequence into this domain.
+	/// @details The insertion is made immediately after the given index.
 	void insert(int, string);
+
+	/// @brief Delete the given index of this domain.
+	void remove(int);
 
 	/// @brief Delete a section of this domain.
 	void remove(int, int);

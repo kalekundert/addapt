@@ -62,10 +62,21 @@ Domain::mutate(int index, char mutation) {
 }
 
 void
-Domain::insert(int index, string insert) {
-	index = normalize_index(seq(), index, IndexEnum::BETWEEN);
-	my_seq.insert(index, insert);
+Domain::insert(int index, char insertion) {
+	insert(index, string(1, insertion));
 }
+
+void
+Domain::insert(int index, string insertion) {
+	index = normalize_index(seq(), index, IndexEnum::BETWEEN);
+	my_seq.insert(index, insertion);
+}
+
+void
+Domain::remove(int index) {
+	index = normalize_index(seq(), index, IndexEnum::ITEM);
+	my_seq.erase(index, 1);
+};
 
 void
 Domain::remove(int start, int end) {

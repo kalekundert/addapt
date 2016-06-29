@@ -69,16 +69,43 @@ TEST_CASE("Test the Domain::insert method") {
 		dummy.seq("AAAA"); dummy.insert(2, "UUUUU"); CHECK(dummy.seq() == "AAUUUUUAA");
 	}
 
+	SECTION("chars can also be inserted") {
+		dummy.seq("AAAA"); dummy.insert(2, 'U'); CHECK(dummy.seq() == "AAUAA");
+	}
+
 	SECTION("out-of-bounds indices throw exceptions") {
 		CHECK_THROWS(dummy.insert(5, "U"));
 		CHECK_THROWS(dummy.insert(-6, "U"));
 	}
 }
 
-TEST_CASE("Test the Domain::remove method") {
+TEST_CASE("Test the Domain::remove(int) method") {
 	Domain dummy("dummy");
 
-	SECTION("indices refer to positions between nucleotides") {
+	SECTION("the index refers to the nucleotides, counting from 0") {
+		dummy.seq("ACGU"); dummy.remove(0); CHECK(dummy.seq() == "CGU");
+		dummy.seq("ACGU"); dummy.remove(1); CHECK(dummy.seq() == "AGU");
+		dummy.seq("ACGU"); dummy.remove(2); CHECK(dummy.seq() == "ACU");
+		dummy.seq("ACGU"); dummy.remove(3); CHECK(dummy.seq() == "ACG");
+	}
+
+	SECTION("negative indices count from the back") {
+		dummy.seq("ACGU"); dummy.remove(-1); CHECK(dummy.seq() == "ACG");
+		dummy.seq("ACGU"); dummy.remove(-2); CHECK(dummy.seq() == "ACU");
+		dummy.seq("ACGU"); dummy.remove(-3); CHECK(dummy.seq() == "AGU");
+		dummy.seq("ACGU"); dummy.remove(-4); CHECK(dummy.seq() == "CGU");
+	}
+
+	SECTION("out-of-bounds indices throw exceptions") {
+		CHECK_THROWS(dummy.remove(3));
+		CHECK_THROWS(dummy.remove(-4));
+	}
+}
+
+TEST_CASE("Test the Domain::remove(int, int) method") {
+	Domain dummy("dummy");
+
+	SECTION("two indices: refer to positions between nucleotides") {
 		dummy.seq("ACGU"); dummy.remove(0, 0); CHECK(dummy.seq() == "ACGU");
 		dummy.seq("ACGU"); dummy.remove(0, 1); CHECK(dummy.seq() == "CGU");
 		dummy.seq("ACGU"); dummy.remove(0, 2); CHECK(dummy.seq() == "GU");
