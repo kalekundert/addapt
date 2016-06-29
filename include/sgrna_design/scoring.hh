@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -23,6 +24,11 @@ enum class LigandEnum {
 	THEO,
 };
 
+enum class ConditionEnum {
+	APO,
+	HOLO,
+};
+
 
 class ScoreFunction {
 
@@ -42,20 +48,33 @@ private:
 
 };
 
+/// @brief The interface to RNA secondary structure predictions.
 class RnaFold {
 
 public:
 
+	/// @brief Return the probability that these two nucleotides will base pair 
+	/// with each other.
+	virtual double base_pair_prob(int, int) const = 0;
+
+};
+
+class ViennaRnaFold : public RnaFold {
+
+public:
+
 	/// @brief Predict how the construct will fold.
-	RnaFold(ConstructConstPtr, LigandEnum=LigandEnum::NONE);
+	ViennaRnaFold(ConstructConstPtr, LigandEnum=LigandEnum::NONE);
 
 	/// @brief Free the ViennaRNA data structures.
-	~RnaFold();
+	~ViennaRnaFold();
+
+	/// @brief Return a string depicting the predicted structure for this 
+	/// sequence.
+	const char *base_pair_string() const;
 
 	/// @brief Return the probability that these two nucleotides will base pair 
 	/// with each other.
-	double base_pair_prob(Nucleotide, Nucleotide) const;
-	double base_pair_prob(Nucleotide, int) const;
 	double base_pair_prob(int, int) const;
 
 private:
@@ -65,6 +84,7 @@ private:
 	// returned by c_str() from getting deleted.
 	string my_seq;
 	vrna_fold_compound_t *my_fc;
+	char *my_fold;
 };
 
 
@@ -99,17 +119,59 @@ class BasePairingTerm : public ScoreTerm {
 public:
 
 	BasePairingTerm(
-			vector<string>, vector<string>, vector<string>, double=1.0);
+			ConditionEnum, vector<string>, vector<string>, double=1.0);
 
 	double evaluate(
 			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
 
 private:
 
-	vector<string> my_selection;
-	vector<string> my_no_lig_targets;
-	vector<string> my_lig_targets;
+	ConditionEnum my_condition;
+	vector<string> my_selection_a;
+	vector<string> my_selection_b;
 
 };
+
+class LigandSensitivityTerm : public ScoreTerm {
+
+public:
+
+	LigandSensitivityTerm(
+			vector<string>, double=1.0);
+
+	double evaluate(
+			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+
+private:
+
+	vector<string> my_domains;
+
+};
+
+class SpecificLigandSensitivityTerm : public ScoreTerm {
+
+public:
+
+	SpecificLigandSensitivityTerm(
+			ConditionEnum, vector<string>, vector<string>, double=1.0);
+
+	double evaluate(
+			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+
+private:
+
+	ConditionEnum my_condition;
+	vector<string> my_selection;
+	vector<string> my_targets;
+
+
+};
+
+}
+
+namespace std {
+
+ostream&
+operator<<(ostream&, const sgrna_design::ConditionEnum&);
 
 }

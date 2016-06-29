@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include <boost/algorithm/string.hpp>
+
 extern "C" {
   #include <ViennaRNA/structure_utils.h>
   #include <ViennaRNA/part_func.h>
@@ -20,26 +22,34 @@ ScoreFunction::operator+=(ScoreTermPtr term) {
 
 double
 ScoreFunction::evaluate(ConstructPtr sgrna) const {
-	RnaFold no_lig(sgrna, LigandEnum::NONE);
-	RnaFold lig(sgrna, LigandEnum::THEO);
+	ViennaRnaFold apo_fold(sgrna, LigandEnum::NONE);
+	ViennaRnaFold holo_fold(sgrna, LigandEnum::THEO);
 
 	double score = 0;
 
 	for(ScoreTermPtr term: my_terms) {
-		score += term->weight() * term->evaluate(sgrna, no_lig, lig);
+		score += term->weight() * term->evaluate(sgrna, apo_fold, holo_fold);
 	}
 
 	return score;
 }
 
 
-RnaFold::RnaFold(ConstructConstPtr sgrna, LigandEnum ligand):
+ViennaRnaFold::ViennaRnaFold(ConstructConstPtr sgrna, LigandEnum ligand):
 
 	my_sgrna(sgrna),
 	my_seq(sgrna->seq()) {
 
+	// Upper-casing the sequence is critically important!  Without this step, 
+	// ViennaRNA will silently produce incorrect results.  I realized I needed to 
+	// do this by carefully reading RNAfold.c when I realized that rhf(6) wasn't 
+	// being folded correctly.
+	boost::to_upper(my_seq);
+
 	my_fc = vrna_fold_compound(
 			my_seq.c_str(), NULL, VRNA_OPTION_MFE | VRNA_OPTION_PF);
+
+	my_fold = new char [my_seq.length() + 1];
 
 	char const *aptamer_seq = NULL;
 	char const *aptamer_fold = NULL;
@@ -66,28 +76,24 @@ RnaFold::RnaFold(ConstructConstPtr sgrna, LigandEnum ligand):
 				my_fc, aptamer_seq, aptamer_fold, aptamer_dg, VRNA_OPTION_DEFAULT);
 	}
 
-	vrna_pf(my_fc, NULL);
+	vrna_pf(my_fc, my_fold);
 
 }
 
-RnaFold::~RnaFold() {
+ViennaRnaFold::~ViennaRnaFold() {
 	if (my_fc) {
 		vrna_fold_compound_free(my_fc);
+		delete [] my_fold;
 	}
 }
 
-double
-RnaFold::base_pair_prob(Nucleotide nuc_a, Nucleotide nuc_b) const {
-	return base_pair_prob(my_sgrna->index(nuc_a), my_sgrna->index(nuc_b));
+char const *
+ViennaRnaFold::base_pair_string() const {
+	return my_fold;
 }
 
 double
-RnaFold::base_pair_prob(Nucleotide nuc_a, int b) const {
-	return base_pair_prob(my_sgrna->index(nuc_a), b);
-}
-
-double
-RnaFold::base_pair_prob(int a, int b) const {
+ViennaRnaFold::base_pair_prob(int a, int b) const {
 	auto indices = normalize_range(my_seq, a, b, IndexEnum::ITEM);
 	// The ViennaRNA matrices are 1-indexed.
 	int i = indices.first + 1;
@@ -146,35 +152,128 @@ domains_to_indices(
 
 
 BasePairingTerm::BasePairingTerm(
-		vector<string> selection,
-		vector<string> no_lig_targets,
-		vector<string> lig_targets,
+		ConditionEnum condition,
+		vector<string> selection_a,
+		vector<string> selection_b,
 		double weight):
 
 	ScoreTerm(weight),
-	my_selection(selection),
-	my_no_lig_targets(no_lig_targets),
-	my_lig_targets(lig_targets) {}
+	my_condition(condition),
+	my_selection_a(selection_a),
+	my_selection_b(selection_b) {}
 
 double
 BasePairingTerm::evaluate(
 		ConstructConstPtr sgrna,
-		RnaFold const &no_lig_fold,
-		RnaFold const &lig_fold) const {
+		RnaFold const &apo_fold,
+		RnaFold const &holo_fold) const {
 
-	vector<int> sele_indices = domains_to_indices(sgrna, my_selection);
-	vector<int> no_lig_indices = domains_to_indices(sgrna, my_no_lig_targets);
-	vector<int> lig_indices = domains_to_indices(sgrna, my_lig_targets);
+	vector<int> indices_a = domains_to_indices(sgrna, my_selection_a);
+	vector<int> indices_b = domains_to_indices(sgrna, my_selection_b);
+	RnaFold const & fold =
+		(my_condition == ConditionEnum::HOLO) ? holo_fold : apo_fold;
 
-	double no_lig_base_pairing = prob_paired(
-			sele_indices, no_lig_indices, no_lig_fold);
-	double lig_base_pairing = prob_paired(
-			sele_indices, lig_indices, lig_fold);
-
-	return no_lig_base_pairing * lig_base_pairing;
+	return prob_paired(indices_a, indices_b, fold);
 
 }
 
+
+LigandSensitivityTerm::LigandSensitivityTerm(
+		vector<string> domains,
+		double weight):
+
+	ScoreTerm(weight),
+	my_domains(domains) {}
+
+double
+LigandSensitivityTerm::evaluate(
+		ConstructConstPtr sgrna,
+		RnaFold const &apo_fold,
+		RnaFold const &holo_fold) const {
+
+	// Return the number of base pairs that differ between the ligand-bound and 
+	// ligand-unbound states, weighted by how much more likely the base pair is 
+	// in one state compared to the other.
+
+	double sensitivity = 0;
+	double p_apo, p_holo;
+
+	vector<int> indices = domains_to_indices(sgrna, my_domains);
+
+	for(auto it_i = indices.begin(); it_i != indices.end(); it_i++) {
+		for(auto it_j = it_i; it_j != indices.end(); it_j++) {
+			p_apo = apo_fold.base_pair_prob(*it_i, *it_j);
+			p_holo = holo_fold.base_pair_prob(*it_i, *it_j);
+
+			if(p_apo > 0 and p_holo > 0) {
+				sensitivity += p_apo * log(p_apo / p_holo);
+				sensitivity += p_holo * log(p_holo / p_apo);
+			}
+		}
+	}
+
+	return fabs(sensitivity);
+}
+
+
+SpecificLigandSensitivityTerm::SpecificLigandSensitivityTerm(
+		ConditionEnum condition,
+		vector<string> selection,
+		vector<string> targets,
+		double weight):
+
+	ScoreTerm(weight),
+	my_condition(condition),
+	my_selection(selection),
+	my_targets(targets) {}
+
+double
+SpecificLigandSensitivityTerm::evaluate(
+		ConstructConstPtr sgrna,
+		RnaFold const &apo_fold,
+		RnaFold const &holo_fold) const {
+
+	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
+	vector<int> target_indices = domains_to_indices(sgrna, my_targets);
+
+	double sensitivity = 0;
+	double p_apo, p_holo;
+
+	for(int i: selection_indices) {
+		for(int j: target_indices) {
+			p_apo = apo_fold.base_pair_prob(i, j);
+			p_holo = holo_fold.base_pair_prob(i, j);
+
+			if(p_apo > 0 and p_holo > 0) {
+				switch(my_condition) {
+					case ConditionEnum::APO:
+						sensitivity += p_apo * log(p_apo / p_holo);
+						break;
+					case ConditionEnum::HOLO:
+						sensitivity += p_holo * log(p_holo / p_apo);
+						break;
+				}
+			}
+		}
+	}
+
+	return sensitivity / selection_indices.size();
+
+
+}
+
+}
+
+namespace std {
+
+ostream &
+operator<<(ostream& out, const sgrna_design::ConditionEnum& condition) {
+	switch(condition) {
+		case sgrna_design::ConditionEnum::APO: out << "APO"; break;
+		case sgrna_design::ConditionEnum::HOLO: out << "HOLO"; break;
+	}
+	return out;
+}
 
 }
 
