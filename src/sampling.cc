@@ -20,11 +20,17 @@ MonteCarlo::apply(ConstructPtr sgrna) const {
 	// Create random number generators that use the Mersenne twister algorithm 
 	// with a state size of 19937 bits.
 	std::mt19937 rng;
-	//auto random = std::bind(std::uniform_real_distribution<>(), rng);
+	auto random = std::bind(std::uniform_real_distribution<>(), rng);
 	auto randmove = std::bind(std::uniform_int_distribution<>(0, my_moves.size()-1), rng);
 
 	// Get an initial score.
 	double score = my_scorefxn->evaluate(sgrna);
+
+	// Keep track of the acceptance rate.
+	int moves_improved = 0;
+	int moves_unchanged = 0;
+	int moves_tolerated = 0;
+	int moves_rejected = 0;
 
 	for(int i = 0; i < my_steps; i++) {
 		// Copy the sgRNA so we can easily undo the move.
@@ -35,23 +41,42 @@ MonteCarlo::apply(ConstructPtr sgrna) const {
 		move->apply(trial_sgrna, rng);
 
 		// Decide whether or not to accept the move.
-		double trial_score = my_scorefxn->evaluate(trial_sgrna);
-		//double score_diff = score - trial_score;
-		//double metropolis_criterion = std::exp(-my_beta * score_diff);
-		//double random_threshold = random();
+		if(sgrna->seq() == trial_sgrna->seq()) {
+			moves_unchanged += 1;
+			continue;
+		}
 
-		//if(metropolis_criterion > random_threshold) {
-		if (trial_score > score) {
+		double trial_score = my_scorefxn->evaluate(trial_sgrna);
+		double score_diff = trial_score - score;
+		double metropolis_criterion = std::exp(my_beta * score_diff);
+		double random_threshold = random();
+
+		if(metropolis_criterion > random_threshold) {
+			moves_improved += (score_diff > 0)? 1:0;
+			moves_tolerated += (score_diff > 0)? 0:1;
+			//std::cout <<
+			//	color("ACCEPTED:  ", ColorEnum::GREEN, StyleEnum::NORMAL) <<
+			//	f("trial_score=%.4f prev_score=%.4f metropolis=%.4f threshold=%.4f")
+			//		% trial_score % score % metropolis_criterion % random_threshold << std::endl;
 			sgrna = trial_sgrna;
 			score = trial_score;
+		}
+		else {
+			moves_rejected += 1;
+			//std::cout <<
+			//	color("REJECTED:  ", ColorEnum::RED, StyleEnum::NORMAL) <<
+			//	f("trial_score=%.4f prev_score=%.4f metropolis=%.4f threshold=%.4f")
+			//		% trial_score % score % metropolis_criterion % random_threshold << std::endl;
 		}
 
 		// Print a progress bar if the program is running in a TTY.
 		if(isatty(1)) {
-			std::cout << "\033[2K\r" << f("[%d/%d]") % (i + 1) % my_steps;
+			std::cout << "\033[2K\r" << f("[%0d/%d]\t") % (i + 1) % my_steps;
 			if(i + 1 == my_steps) std::cout << std::endl;
 			else std::cout << std::flush;
 		}
+
+		std::cout << *sgrna << std::endl;
 
 		// Print some debugging info.
 		//std::cerr << score << '\t' << sgrna->seq() << std::endl;
@@ -60,6 +85,15 @@ MonteCarlo::apply(ConstructPtr sgrna) const {
 		//	std::cout << f("score=%.5f seq=%s") % score % *sgrna << std::endl;
 		//}
 	}
+
+	std::cout << std::endl;
+	std::cout << "Monte Carlo Statistics" << std::endl;
+	std::cout << "──────────────────────" << std::endl;
+	std::cout << f("Improved rate: %.4f%%") % (100 * moves_improved / my_steps) << std::endl;
+	std::cout << f("Unchanged rate: %.4f%%") % (100 * moves_unchanged / my_steps) << std::endl;
+	std::cout << f("Tolerated rate: %.4f%%") % (100 * moves_tolerated / my_steps) << std::endl;
+	std::cout << f("Rejected rate: %.4f%%") % (100 * moves_rejected / my_steps) << std::endl;
+	std::cout << std::endl;
 
 	return sgrna;
 }
