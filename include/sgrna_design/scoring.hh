@@ -114,24 +114,6 @@ private:
 
 };
 
-class BasePairingTerm : public ScoreTerm {
-
-public:
-
-	BasePairingTerm(
-			ConditionEnum, vector<string>, vector<string>, double=1.0);
-
-	double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
-
-private:
-
-	ConditionEnum my_condition;
-	vector<string> my_selection_a;
-	vector<string> my_selection_b;
-
-};
-
 class LigandSensitivityTerm : public ScoreTerm {
 
 public:

@@ -172,7 +172,7 @@ TEST_CASE("Test folding a hairpin with an aptamer", "[scoring]") {
 	}
 }
 
-TEST_CASE("Test folding rhf(6)") {
+TEST_CASE("Test folding rhf(6)", "[scoring]") {
 	ConstructConstPtr rhf_6 = build_rhf_6_construct();
 
 	// Indicate which base pairs I expect to form.
@@ -227,6 +227,48 @@ TEST_CASE("Test folding rhf(6)") {
 
 		CHECK(apo_fold.base_pair_prob(i,j) < apo_threshold);
 		CHECK(holo_fold.base_pair_prob(i,j) > holo_threshold);
+	}
+}
+
+TEST_CASE("Test the score function class", "[scoring]") {
+	ScoreFunction scorefxn;
+	ConstructPtr dummy_construct = make_shared<Construct>();
+	*dummy_construct += make_shared<Domain>("dummy", "UUUU");
+
+	class DummyTerm : public ScoreTerm {
+
+	public:
+
+		DummyTerm(double score, double weight):
+			ScoreTerm(weight), my_score(score) {}
+
+		double
+		evaluate(ConstructConstPtr, RnaFold const &, RnaFold const &) const {
+			return my_score;
+		}
+
+	private:
+		double my_score;
+
+	};
+
+	CHECK(scorefxn.evaluate(dummy_construct) == 0);
+
+	SECTION("single score terms are summed correctly") {
+		scorefxn += make_shared<DummyTerm>(10, 1);
+		CHECK(scorefxn.evaluate(dummy_construct) == Approx(10));
+	}
+
+	SECTION("multiple score terms are summed correctly") {
+		scorefxn += make_shared<DummyTerm>(10, 1);
+		scorefxn += make_shared<DummyTerm>(5, 1);
+		CHECK(scorefxn.evaluate(dummy_construct) == Approx(15));
+	}
+
+	SECTION("weights are applied correctly") {
+		scorefxn += make_shared<DummyTerm>(10, 1);
+		scorefxn += make_shared<DummyTerm>(10, 0.5);
+		CHECK(scorefxn.evaluate(dummy_construct) == Approx(15));
 	}
 }
 
@@ -365,191 +407,3 @@ TEST_CASE("Test the 'specific ligand sensitivity' score term", "[scoring]") {
 }
 
 
-/*
-
-TEST_CASE("Test the BasePairingTerm::evaluate method", "[scoring]") {
-	// Make a construct that will fold very differently with and without ligand.  
-	// This construct has an aptamer on the 5' end and a decoy sequence (that 
-	// pairs internally with the aptamer) on the 3' end.  The decoy stem should 
-	// form in the absence of ligand, while the ends of the aptamer should base 
-	// pair with ligand:
-
-	// G AUACCA GCC GAAA GGC CCUUGGCA GCC UUUC
-	// . ...... ... (((( ((( ........ ))) ))))  [ΔG=-8.80 kcal/mol, apo]
-	// ( ...((. ((( .... ))) ....)).. .). ....  [ΔG=-11.81 kcal/mol, holo]
-
-	ConstructPtr sensor = make_shared<Construct>();
-	*sensor += make_shared<Domain>("target", "G");
-	*sensor += make_shared<Domain>("aptamer/a", "AUACCA");
-	*sensor += make_shared<Domain>("aptamer/b", "GCC");
-	*sensor += make_shared<Domain>("aptamer/c", "GAAA");
-	*sensor += make_shared<Domain>("aptamer/d", "GGC");
-	*sensor += make_shared<Domain>("aptamer/e", "CCUUGGCA");
-	*sensor += make_shared<Domain>("decoy/a", "GCC");
-	*sensor += make_shared<Domain>("decoy/b", "UUUC");
-
-	// Create the fold objects the score terms will need.
-
-	RnaFold no_lig_fold(sensor, LigandEnum::NONE);
-	RnaFold lig_fold(sensor, LigandEnum::THEO);
-
-	// Evaluate the base-pairing of the ligand-unbound state.
-
-	SECTION("evaluate the decoy stem") {
-		BasePairingTerm c_term(
-				ConditionEnum::APO,
-				{"aptamer/c"},
-				{"decoy/b"}
-		);
-		BasePairingTerm d_term(
-				ConditionEnum::APO,
-				{"aptamer/d"},
-				{"decoy/a"}
-		);
-		BasePairingTerm cd_term(
-				ConditionEnum::APO,
-				{"aptamer/c", "aptamer/d"},
-				{"decoy/a", "decoy/b"}
-		);
-
-		double c_eval = c_term.evaluate(sensor, no_lig_fold, lig_fold);
-		double d_eval = d_term.evaluate(sensor, no_lig_fold, lig_fold);
-		double cd_eval = cd_term.evaluate(sensor, no_lig_fold, lig_fold);
-
-		CHECK(c_eval > 4 * 0.9);
-		CHECK(d_eval > 3 * 0.9);
-		CHECK(cd_eval == Approx(c_eval + d_eval));
-	}
-
-	// Evaluate the base-pairing of the ligand-bound state.
-
-	SECTION("evaluate the target stem") {
-		BasePairingTerm t_term(
-				ConditionEnum::HOLO,
-				{"target"},
-				{"decoy/a"}
-		);
-		BasePairingTerm a_term(
-				ConditionEnum::HOLO,
-				{"aptamer/a"},
-				{"aptamer/e"}
-		);
-		BasePairingTerm b_term(
-				ConditionEnum::HOLO,
-				{"aptamer/b"},
-				{"aptamer/d"}
-		);
-		BasePairingTerm tab_term(
-				ConditionEnum::HOLO,
-				{"target", "aptamer/a", "aptamer/b"},
-				{"aptamer/d", "aptamer/e", "decoy/a"}
-		);
-
-		double t_eval = t_term.evaluate(sensor, no_lig_fold, lig_fold);
-		double a_eval = a_term.evaluate(sensor, no_lig_fold, lig_fold);
-		double b_eval = b_term.evaluate(sensor, no_lig_fold, lig_fold);
-		double tab_eval = tab_term.evaluate(sensor, no_lig_fold, lig_fold);
-
-		CHECK(t_eval > 1 * 0.9);
-		CHECK(a_eval > 2 * 0.9);
-		CHECK(b_eval > 3 * 0.9);
-		CHECK(tab_eval == Approx(t_eval + a_eval + b_eval).epsilon(1e-3));
-	}
-
-	// Evaluate the base pairing of a state that shouldn't exist.
-	
-	SECTION("evaluate non-existent base pairs") {
-		BasePairingTerm cd_term(
-				ConditionEnum::HOLO,	// switch condition
-				{"aptamer/c", "aptamer/d"},
-				{"decoy/a", "decoy/b"}
-		);
-		BasePairingTerm tab_term(
-				ConditionEnum::APO,	// switch condition
-				{"target", "aptamer/a", "aptamer/b"},
-				{"aptamer/d", "aptamer/e", "decoy/b"}
-		);
-		BasePairingTerm c_term(
-				ConditionEnum::APO,
-				{"aptamer/c"},
-				{"aptamer/d"}
-		);
-
-		double cd_eval = cd_term.evaluate(sensor, no_lig_fold, lig_fold);
-		double tab_eval = tab_term.evaluate(sensor, no_lig_fold, lig_fold);
-		double c_eval = c_term.evaluate(sensor, no_lig_fold, lig_fold);
-
-		CHECK(cd_eval < 0.1);
-		CHECK(tab_eval < 0.12);
-		CHECK(c_eval < 0.1);
-	}
-}
-
-TEST_CASE("Test the 'ligand sensitivity' term", "[scoring]") {
-	// Make a term that will score the "eval/a" and "eval/b" domains.  All the 
-	// tests in this case are constructed to have these domains.
-	LigandSensitivityTerm term({"eval/a", "eval/b"});
-
-	SECTION("sequences that are always base-paired score poorly") {
-		ConstructPtr rna = make_shared<Construct>();
-		*rna += make_shared<Domain>("eval/a", "ACGU");
-		*rna += make_shared<Domain>("ignore", "GAAA");
-		*rna += make_shared<Domain>("eval/b", "ACGU");
-
-		RnaFold no_lig_fold(rna, LigandEnum::NONE);
-		RnaFold lig_fold(rna, LigandEnum::THEO);
-
-		CHECK(term.evaluate(rna, no_lig_fold, lig_fold) == Approx(0.0));
-	}
-
-	SECTION("sequences that are never base-paired score poorly") {
-		ConstructPtr rna = make_shared<Construct>();
-		*rna += make_shared<Domain>("eval/a", "UUUUUU");
-		*rna += make_shared<Domain>("eval/b", "UUUUUU");
-
-		RnaFold no_lig_fold(rna, LigandEnum::NONE);
-		RnaFold lig_fold(rna, LigandEnum::THEO);
-
-		CHECK(term.evaluate(rna, no_lig_fold, lig_fold) == Approx(0.0));
-	}
-
-	SECTION("sequences that are affected by the ligand score well") {
-		ConstructPtr rna = make_shared<Construct>();
-		*rna += make_shared<Domain>("eval/a", "G");
-		*rna += make_shared<Domain>("aptamer", "AUACCAGCCGAAAGGCCCUUGGCAG");
-		*rna += make_shared<Domain>("eval/b", "C");
-
-		RnaFold no_lig_fold(rna, LigandEnum::NONE);
-		RnaFold lig_fold(rna, LigandEnum::THEO);
-
-		CHECK(term.evaluate(rna, no_lig_fold, lig_fold) > log(1 * 50));
-	}
-
-	SECTION("rhf(6) scores well") {
-		ConstructPtr rna = make_shared<Construct>();
-		*rna += make_shared<Domain>("lower_stem/a", "guuuua");
-		*rna += make_shared<Domain>("upper_stem", "gagcuagaaauagcaagu");
-		*rna += make_shared<Domain>("lower_stem/b", "uaaaau");
-		*rna += make_shared<Domain>("nexus/x", "aagg");
-		*rna += make_shared<Domain>("nexus/y", "cuagu");
-		*rna += make_shared<Domain>("nexus/z", "ccCuU");
-		*rna += make_shared<Domain>("ruler", "UUC");
-		*rna += make_shared<Domain>("hairpin/u", "GCC");
-		*rna += make_shared<Domain>("aptamer", "gauaccagccgaaaggcccuuggcagc");
-		*rna += make_shared<Domain>("hairpin/v", "GAC");
-		*rna += make_shared<Domain>("tail", "ggcaccgagucggugcuuuuuu");
-
-		RnaFold no_lig_fold(rna, LigandEnum::NONE);
-		RnaFold lig_fold(rna, LigandEnum::THEO);
-
-		cout << *rna << endl;
-		cout << no_lig_fold.base_pair_string() << endl;
-		cout << lig_fold.base_pair_string() << endl;
-
-		LigandSensitivityTerm xz_term({"nexus/x", "nexus/z"});
-		CHECK(xz_term.evaluate(rna, no_lig_fold, lig_fold) > log(4 * 2.5));
-	}
-}
-
-
-*/

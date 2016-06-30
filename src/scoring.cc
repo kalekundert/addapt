@@ -117,23 +117,6 @@ ScoreTerm::weight(double weight) {
 }
 
 
-double
-prob_paired(
-		vector<int> indices_i,
-		vector<int> indices_j,
-		RnaFold const & fold) {
-
-	double prob = 0;
-
-	for(int i: indices_i) {
-		for(int j: indices_j) {
-			prob += fold.base_pair_prob(i, j);
-		}
-	}
-
-	return prob;
-}
-
 vector<int>
 domains_to_indices(
 		ConstructConstPtr sgrna,
@@ -148,33 +131,6 @@ domains_to_indices(
 	}
 
 	return indices;
-}
-
-
-BasePairingTerm::BasePairingTerm(
-		ConditionEnum condition,
-		vector<string> selection_a,
-		vector<string> selection_b,
-		double weight):
-
-	ScoreTerm(weight),
-	my_condition(condition),
-	my_selection_a(selection_a),
-	my_selection_b(selection_b) {}
-
-double
-BasePairingTerm::evaluate(
-		ConstructConstPtr sgrna,
-		RnaFold const &apo_fold,
-		RnaFold const &holo_fold) const {
-
-	vector<int> indices_a = domains_to_indices(sgrna, my_selection_a);
-	vector<int> indices_b = domains_to_indices(sgrna, my_selection_b);
-	RnaFold const & fold =
-		(my_condition == ConditionEnum::HOLO) ? holo_fold : apo_fold;
-
-	return prob_paired(indices_a, indices_b, fold);
-
 }
 
 
