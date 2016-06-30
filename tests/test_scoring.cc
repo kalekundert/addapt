@@ -230,7 +230,59 @@ TEST_CASE("Test folding rhf(6)") {
 	}
 }
 
-TEST_CASE("Test the SpecificLigandSensitivity score term", "[scoring]") {
+TEST_CASE("Test the 'ligand sensitivity' score term", "[scoring]") {
+	// Make a construct with individually indexable nucleotides.
+	ConstructPtr dummy_construct = make_shared<Construct>();
+	*dummy_construct += make_shared<Domain>("a", "UU");
+	*dummy_construct += make_shared<Domain>("b", "U");
+	*dummy_construct += make_shared<Domain>("c", "U");
+
+	// Define fake base-pairing probabilities for this construct.
+	DummyRnaFold dummy_apo_fold;
+	DummyRnaFold dummy_holo_fold;
+
+	dummy_apo_fold[{0,3}] = 0.10;
+	dummy_holo_fold[{0,3}] = 0.40;
+
+	dummy_apo_fold[{1,2}] = 0.30;
+	dummy_holo_fold[{1,2}] = 0.10;
+
+	// Define expected scores for various combinations of nucleotides.
+	struct Test {
+		vector<string> selection;
+		double expected_score;
+	};
+
+	vector<Test> tests = {
+		// The score is 0 if there aren't any base pairs.
+		{{"a"}, 0},
+		{{"b"}, 0},
+		{{"c"}, 0},
+
+		// The score increases with the number of ligand-sensitive base pairs.
+		{{"a","b"}, (0.3-0.1)*log(3)/3},
+		{{"a","c"}, (0.4-0.1)*log(4)/3},
+		{{"a","b","c"}, (0.3-0.1)*log(3)/4 + (0.4-0.1)*log(4)/4}
+	};
+
+	// Make sure each scenario is scored correctly.
+
+	for(Test test: tests) {
+		LigandSensitivityTerm term(test.selection);
+		double score = term.evaluate(
+				dummy_construct, dummy_apo_fold, dummy_holo_fold);
+
+		CAPTURE(test.selection);
+		CHECK(score == Approx(test.expected_score));
+	}
+
+	// You can't score empty selections.
+
+	CHECK_THROWS(LigandSensitivityTerm term({}));
+
+}
+
+TEST_CASE("Test the 'specific ligand sensitivity' score term", "[scoring]") {
 	// Make a construct with individually indexable nucleotides.
 	ConstructPtr dummy_construct = make_shared<Construct>();
 	*dummy_construct += make_shared<Domain>("a", "U");
@@ -258,10 +310,14 @@ TEST_CASE("Test the SpecificLigandSensitivity score term", "[scoring]") {
 
 	vector<Test> tests = {
 		// The score is 0 if there aren't any base pairs.
+		{ConditionEnum::APO,  {"a"}, {}, 0},
+		{ConditionEnum::HOLO, {"a"}, {}, 0},
 		{ConditionEnum::APO,  {"a"}, {"a"}, 0},
 		{ConditionEnum::HOLO, {"a"}, {"a"}, 0},
 		{ConditionEnum::APO,  {"a"}, {"B"}, 0},
 		{ConditionEnum::HOLO, {"a"}, {"B"}, 0},
+		{ConditionEnum::APO,  {"b"}, {}, 0},
+		{ConditionEnum::HOLO, {"b"}, {}, 0},
 		{ConditionEnum::APO,  {"b"}, {"b"}, 0},
 		{ConditionEnum::HOLO, {"b"}, {"b"}, 0},
 		{ConditionEnum::APO,  {"b"}, {"A"}, 0},
@@ -300,6 +356,12 @@ TEST_CASE("Test the SpecificLigandSensitivity score term", "[scoring]") {
 
 		CHECK(score == Approx(test.expected_score));
 	}
+
+	// You can't score empty selections.
+
+	CHECK_THROWS(
+			SpecificLigandSensitivityTerm term(ConditionEnum::APO, {}, {"a"}));
+
 }
 
 

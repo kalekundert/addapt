@@ -144,7 +144,7 @@ public:
 
 private:
 
-	vector<string> my_domains;
+	vector<string> my_selection;
 
 };
 

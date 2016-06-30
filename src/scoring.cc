@@ -179,11 +179,16 @@ BasePairingTerm::evaluate(
 
 
 LigandSensitivityTerm::LigandSensitivityTerm(
-		vector<string> domains,
+		vector<string> selection,
 		double weight):
 
 	ScoreTerm(weight),
-	my_domains(domains) {}
+	my_selection(selection) {
+
+	if(my_selection.empty()) {
+		throw "cannot score empty selection";
+	}
+}
 
 double
 LigandSensitivityTerm::evaluate(
@@ -191,14 +196,14 @@ LigandSensitivityTerm::evaluate(
 		RnaFold const &apo_fold,
 		RnaFold const &holo_fold) const {
 
-	// Return the number of base pairs that differ between the ligand-bound and 
-	// ligand-unbound states, weighted by how much more likely the base pair is 
-	// in one state compared to the other.
+	// Return the number of base pairs (combined between the apo and holo states) 
+	// weighted by how much more likely each base pair is in one state compared 
+	// to the other.
 
 	double sensitivity = 0;
 	double p_apo, p_holo;
 
-	vector<int> indices = domains_to_indices(sgrna, my_domains);
+	vector<int> indices = domains_to_indices(sgrna, my_selection);
 
 	for(auto it_i = indices.begin(); it_i != indices.end(); it_i++) {
 		for(auto it_j = it_i; it_j != indices.end(); it_j++) {
@@ -212,7 +217,12 @@ LigandSensitivityTerm::evaluate(
 		}
 	}
 
-	return fabs(sensitivity);
+	// There is some cancellation going on here.  We should double the 
+	// normalization factor because we counted base pairs in apo state and the 
+	// holo state, but we should halve it because we can only expect N 
+	// nucleotides to form at most N/2 base pairs.
+
+	return sensitivity / indices.size();
 }
 
 
@@ -225,7 +235,12 @@ SpecificLigandSensitivityTerm::SpecificLigandSensitivityTerm(
 	ScoreTerm(weight),
 	my_condition(condition),
 	my_selection(selection),
-	my_targets(targets) {}
+	my_targets(targets) {
+	
+	if(my_selection.empty()) {
+		throw "cannot score empty selection";
+	}
+}
 
 double
 SpecificLigandSensitivityTerm::evaluate(
