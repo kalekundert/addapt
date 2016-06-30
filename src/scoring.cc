@@ -178,6 +178,15 @@ BasePairingTerm::evaluate(
 }
 
 
+// Score terms I might want
+// ========================
+// 1. RequiredBasePairing
+//
+// 2. Rename SpecificLigandSensitivityTerm to ConditionalBasePairing
+//
+// 3. Conditionally unpaired (i.e. to prevent misfolding the nexus).
+//
+
 LigandSensitivityTerm::LigandSensitivityTerm(
 		vector<string> selection,
 		double weight):
