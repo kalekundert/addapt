@@ -8,6 +8,8 @@ LIB := -L/home/kale/.local/lib \
 INC := -isystem /home/kale/.local/include \
        -isystem /usr/local/include \
        -I include
+#TEST_CFLAGS := $(CFLAGS) -fprofile-arcs -ftest-coverage
+#TEST_LIB := $(LIB) -lgcov --coverage
 
 SRC_OBJS := $(patsubst %.cc,build/%.o,$(wildcard src/*.cc))
 TEST_OBJS := $(patsubst %.cc,build/%.o,$(wildcard tests/*.cc))
@@ -15,7 +17,7 @@ TEST_OBJS := $(patsubst %.cc,build/%.o,$(wildcard tests/*.cc))
 # Rules for building apps.
 
 mh: bin/mh
-	$< -n100 2> bin/mh.log
+	$<
 
 bin/%: build/apps/%.o $(SRC_OBJS) $(EXTERNAL_OBJS)
 	@mkdir -p bin

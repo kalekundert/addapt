@@ -1,4 +1,5 @@
 #include <cmath>
+#include <chrono>
 #include <iostream>
 #include <string>
 
@@ -27,18 +28,18 @@ Usage:
   mh [options]
 
 Options:
-  -n --num-moves <num>   [default=100]
+  -n --num-moves=<num>    [default: 100]
     The number of moves to attempt in the Monte Carlo simulation.  I haven't 
     yet determined how many moves are required to reach convergence.
-
-  -t --kt <beta>         [default=1.0]
+    
+  -k --kt=<beta>          [default: 5.0]
     The likelihood of accepting a negative move.  If kT=0, only positive moves 
     will be accepted.  In the limit that kT=inf, every move will be accepted.  
     This parameter should be tuned to the magnitude of the score function.
-
+    
   -v --version
     Display the version of ``mh`` being used.
-
+    
   -h --help
     Display this usage information.
 )""";
@@ -186,14 +187,20 @@ int main(int argc, char **argv) {
 	ConstructPtr mh = build_mh_sgrna();
 	ConstructPtr rhf_6 = build_rhf_6_sgrna();
 	ConstructPtr wt = mh->copy();
-	ScoreFunctionPtr scorefxn = build_mh_scorefxn();
+	ScoreFunctionPtr scorefxn = build_mh_scorefxn(ScorefxnEnum::GENERAL);
 	MonteCarloPtr sampler = build_mh_sampler(wt);
+	ReporterPtr reporter = make_shared<CsvTrajectoryReporter>("mh.tsv");
+	std::mt19937 rng;
 
 	sampler->scorefxn(scorefxn);
 	sampler->num_steps(stoi(args["--num-moves"].asString()));
-	//sampler->beta(stod(args["--kt"].asString()));
-	sampler->beta(10);
-	mh = sampler->apply(mh);
+	sampler->beta(stod(args["--kt"].asString()));
+	sampler->add_reporter(reporter);
+
+	//std::myclock::duration secs = myclock::now() - std::beginning;
+	//std::mt19937 rng (secs.count());
+
+	mh = sampler->apply(mh, rng);
 
 	cout << f("wt:     %s (%.4f)") % *wt % scorefxn->evaluate(wt) << endl;
 	cout << f("rhf(6): %s (%.4f)") % *rhf_6 % scorefxn->evaluate(rhf_6) << endl;

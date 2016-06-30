@@ -4,3 +4,4 @@ bin/
 tests/run_tests
 a.out
 *.gcno
+*.tsv
