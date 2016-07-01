@@ -11,7 +11,9 @@ namespace sgrna_design {
 MonteCarlo::MonteCarlo(): 
 	my_steps(0),
 	my_thermostat(std::make_shared<FixedThermostat>(1)),
-	my_reporters({std::make_shared<ProgressReporter>()}) {}
+	my_scorefxn(std::make_shared<ScoreFunction>()),
+	my_moves(),
+	my_reporters() {}
 
 ConstructPtr
 MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {

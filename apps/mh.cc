@@ -32,12 +32,13 @@ Options:
     The number of moves to attempt in the design simulation.  I haven't yet 
     determined how many moves are required to reach convergence.
     
-  -T --temperature <schedule>    [default: 5.0]
+  -T --temperature <schedule>    [default: auto]
     The temperature to use for the Metropolis criterion, which affects the 
     likelihood of accepting a negative move.  If T=0, only positive moves will 
     be accepted.  In the limit that T=inf, every move will be accepted.  You 
-    can either specify a fixed temperature (e.g. "5") or a multi-cooled 
-    simulated annealing schedule (e.g. "5x 10=>0").
+    can specify a fixed temperature (e.g. "5"), a multi-cooled simulated 
+    annealing schedule (e.g. "5x 10=>0"), or schedule that tries to achieve 
+    a certain acceptance rate (e.g. "auto 50%").
     
   -r --random-seed <seed>        [default: 0]
     The seed for the random number generator.  If running in parallel, this 
@@ -201,6 +202,7 @@ int main(int argc, char **argv) {
 	MonteCarloPtr sampler = build_mh_sampler(wt);
 	ThermostatPtr thermostat = build_thermostat(
 			args["--temperature"].asString());
+	ReporterPtr progress_bar = make_shared<ProgressReporter>();
 	ReporterPtr traj_reporter = make_shared<CsvTrajectoryReporter>(
 			args["--output"].asString());
 	std::mt19937 rng(stoi(args["--random-seed"].asString()));
@@ -208,6 +210,7 @@ int main(int argc, char **argv) {
 	sampler->num_steps(stoi(args["--num-moves"].asString()));
 	sampler->thermostat(thermostat);
 	sampler->scorefxn(scorefxn);
+	sampler->add_reporter(progress_bar);
 	sampler->add_reporter(traj_reporter);
 
 	mh = sampler->apply(mh, rng);
