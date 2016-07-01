@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+
+"""\
+Usage:
+    mc_stats <trajectory.tsv>
+"""
+
+import docopt
+import pandas as pd
+
+args = docopt.docopt(__doc__)
+trajectory = pd.read_table(args['<trajectory.tsv>'])
+outcome_counts = trajectory['outcome'].value_counts()
+outcome_percents = 100 * outcome_counts / sum(outcome_counts)
+
+print("Outcome   Score        Freq")
+print("───────────────────────────")
+print("accepted  improved   {:5.2f}%".format(outcome_percents['ACCEPT_IMPROVED']))
+print("          unchanged  {:5.2f}%".format(outcome_percents['ACCEPT_UNCHANGED']))
+print("          worsened   {:5.2f}%".format(outcome_percents['ACCEPT_WORSENED']))
+print("rejected             {:5.2f}%".format(outcome_percents['REJECT']))
+
+
