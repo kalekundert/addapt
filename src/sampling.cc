@@ -343,60 +343,60 @@ ProgressReporter::update(MonteCarloStep const &step) {
 }
 
 
-CsvTrajectoryReporter::CsvTrajectoryReporter(string path):
+TsvTrajectoryReporter::TsvTrajectoryReporter(string path):
 	my_path(path) {}
 
 void
-CsvTrajectoryReporter::start(MonteCarloStep const & step) {
-	my_csv.open(my_path);
+TsvTrajectoryReporter::start(MonteCarloStep const & step) {
+	my_tsv.open(my_path);
 
-	my_csv << "step\t";
-	my_csv << "num_steps\t";
-	my_csv << "current_score\t";
-	my_csv << "proposed_score\t";
-	my_csv << "score_diff\t";
-	my_csv << "temperature\t";
-	my_csv << "metropolis_criterion\t";
-	my_csv << "random_threshold\t";
-	my_csv << "move\t";
-	my_csv << "outcome\t";
+	my_tsv << "step\t";
+	my_tsv << "num_steps\t";
+	my_tsv << "current_score\t";
+	my_tsv << "proposed_score\t";
+	my_tsv << "score_diff\t";
+	my_tsv << "temperature\t";
+	my_tsv << "metropolis_criterion\t";
+	my_tsv << "random_threshold\t";
+	my_tsv << "move\t";
+	my_tsv << "outcome\t";
 
 	for(auto domain: step.current_sgrna->domains()) {
-		my_csv << "current_" << domain->name() << "\t";
+		my_tsv << "current_" << domain->name() << "\t";
 	}
 	for(auto domain: step.current_sgrna->domains()) {
-		my_csv << "proposed_" << domain->name() << "\t";
+		my_tsv << "proposed_" << domain->name() << "\t";
 	}
 	
-	my_csv << std::endl;
+	my_tsv << std::endl;
 }
 
 void
-CsvTrajectoryReporter::update(MonteCarloStep const &step) {
-	my_csv << step.i << "\t";
-	my_csv << step.num_steps << "\t";
-	my_csv << step.current_score << "\t";
-	my_csv << step.proposed_score << "\t";
-	my_csv << step.score_diff << "\t";
-	my_csv << step.temperature << "\t";
-	my_csv << step.metropolis_criterion << "\t";
-	my_csv << step.random_threshold << "\t";
-	my_csv << step.move->name() << "\t";
-	my_csv << step.outcome << "\t";
+TsvTrajectoryReporter::update(MonteCarloStep const &step) {
+	my_tsv << step.i << "\t";
+	my_tsv << step.num_steps << "\t";
+	my_tsv << step.current_score << "\t";
+	my_tsv << step.proposed_score << "\t";
+	my_tsv << step.score_diff << "\t";
+	my_tsv << step.temperature << "\t";
+	my_tsv << step.metropolis_criterion << "\t";
+	my_tsv << step.random_threshold << "\t";
+	my_tsv << step.move->name() << "\t";
+	my_tsv << step.outcome << "\t";
 
 	for(auto domain: step.current_sgrna->domains()) {
-		my_csv << domain->seq() << "\t";
+		my_tsv << domain->seq() << "\t";
 	}
 	for(auto domain: step.proposed_sgrna->domains()) {
-		my_csv << domain->seq() << "\t";
+		my_tsv << domain->seq() << "\t";
 	}
 
-	my_csv << std::endl;
+	my_tsv << std::endl;
 }
 
 void
-CsvTrajectoryReporter::finish(MonteCarloStep const &step) {
-	my_csv.close();
+TsvTrajectoryReporter::finish(MonteCarloStep const &step) {
+	my_tsv.close();
 }
 
 

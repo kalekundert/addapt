@@ -204,11 +204,11 @@ public:
 
 /// @details Columns will become misaligned if domains are added or removed 
 /// during the simulation.
-class CsvTrajectoryReporter : public Reporter {
+class TsvTrajectoryReporter : public Reporter {
 
 public:
 
-	CsvTrajectoryReporter(string);
+	TsvTrajectoryReporter(string);
 
 	void start(MonteCarloStep const &);
 	void update(MonteCarloStep const &);
@@ -217,7 +217,7 @@ public:
 private:
 
 	string my_path;
-	std::ofstream my_csv;
+	std::ofstream my_tsv;
 };
 
 

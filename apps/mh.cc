@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
 	ThermostatPtr thermostat = build_thermostat(
 			args["--temperature"].asString());
 	ReporterPtr progress_bar = make_shared<ProgressReporter>();
-	ReporterPtr traj_reporter = make_shared<CsvTrajectoryReporter>(
+	ReporterPtr traj_reporter = make_shared<TsvTrajectoryReporter>(
 			args["--output"].asString());
 	std::mt19937 rng(stoi(args["--random-seed"].asString()));
 
