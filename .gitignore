@@ -5,3 +5,4 @@ tests/run_tests
 a.out
 *.gcno
 *.tsv
+__pycache__

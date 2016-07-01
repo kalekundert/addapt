@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+
+"""\
+Usage:
+    plot_traj <trajectories>...
+"""
+
+import docopt
+import tango
+import pandas as pd
+from pylab import *
+
+args = docopt.docopt(__doc__)
+for i, tsv_path in enumerate(args['<trajectories>']):
+    traj = pd.read_table(tsv_path)
+    color = tango.color_from_cycle(i)
+
+    subplot(2, 1, 1)
+    plot(traj['step'], traj['current_score'], label="Current Score", color=color)
+    plot(traj['step'], traj['proposed_score'], label="Proposed Score", color=color, linestyle=':')
+    ylabel('Score')
+    #legend(loc='best')
+
+    subplot(2, 1, 2, sharex=gca())
+    plot(traj['step'], 1/traj['beta'], color=color)
+    xlabel('Step')
+    ylabel('Temperature')
+
+tight_layout()
+show()
+
