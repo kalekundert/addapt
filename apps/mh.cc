@@ -44,7 +44,7 @@ Options:
     The seed for the random number generator.  If running in parallel, this 
     should be different for each job.
     
-  -o --output <path>             [default: mh.tsv]
+  -o --output <path>             [default: logs/mh.tsv]
     The path where the trajectory of the design simulation will be saved.  This 
     trajectory includes score and sequences for every step of the simulation.
     
