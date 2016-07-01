@@ -17,7 +17,7 @@ TEST_OBJS := $(patsubst %.cc,build/%.o,$(wildcard tests/*.cc))
 # Rules for building apps.
 
 mh: bin/mh
-	$<
+	$< -n20
 
 bin/%: build/apps/%.o $(SRC_OBJS) $(EXTERNAL_OBJS)
 	@mkdir -p bin

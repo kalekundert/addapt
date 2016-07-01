@@ -12,6 +12,7 @@
 namespace sgrna_design {
 
 using f = boost::format;
+using std::make_shared;
 using std::string;
 using std::vector;
 using std::pair;

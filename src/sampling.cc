@@ -1,15 +1,16 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <regex>
 
 #include <sgrna_design/sampling.hh>
+#include <sgrna_design/utils.hh>
 
 namespace sgrna_design {
 
-MonteCarlo::MonteCarlo(double beta, int num_steps, ScoreFunctionPtr scorefxn):
-	my_beta(beta),
-	my_steps(num_steps),
-	my_scorefxn(scorefxn),
+MonteCarlo::MonteCarlo(): 
+	my_steps(0),
+	my_thermostat(std::make_shared<FixedThermostat>(1)),
 	my_reporters({std::make_shared<ProgressReporter>()}) {}
 
 ConstructPtr
@@ -24,7 +25,6 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 	MonteCarloStep step;
 	step.num_steps = my_steps; step.i = -1;
 	step.current_sgrna = sgrna;
-	step.beta = my_beta;
 
 	// Create random number distributions for later use.
 	auto random = std::bind(std::uniform_real_distribution<>(), rng);
@@ -47,6 +47,11 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 	}
 
 	for(step.i = 0; step.i < step.num_steps; step.i++) {
+		// Get the temperature for the Metropolis criterion.  This has to be done 
+		// every iteration, even if no accept/reject decision needs to be made.
+
+		step.temperature = my_thermostat->adjust(step);
+
 		// Copy the sgRNA so we can easily undo the move.
 		step.proposed_sgrna = step.current_sgrna->copy();
 
@@ -63,7 +68,7 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 		else {
 			step.proposed_score = my_scorefxn->evaluate(step.proposed_sgrna);
 			step.score_diff = step.proposed_score - step.current_score;
-			step.metropolis_criterion = std::exp(step.beta * step.score_diff);
+			step.metropolis_criterion = std::exp(step.score_diff / step.temperature);
 			step.random_threshold = random();
 
 			if(step.metropolis_criterion < step.random_threshold) {
@@ -95,16 +100,6 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 	return step.current_sgrna;
 }
 
-double
-MonteCarlo::beta() const {
-	return my_beta;
-}
-
-void
-MonteCarlo::beta(double beta) {
-	my_beta = beta;
-}
-
 int
 MonteCarlo::num_steps() const {
 	return my_steps;
@@ -113,6 +108,16 @@ MonteCarlo::num_steps() const {
 void
 MonteCarlo::num_steps(int num_steps) {
 	my_steps = num_steps;
+}
+
+ThermostatPtr
+MonteCarlo::thermostat() const {
+	return my_thermostat;
+}
+
+void
+MonteCarlo::thermostat(ThermostatPtr thermostat) {
+	my_thermostat = thermostat;
 }
 
 ScoreFunctionPtr
@@ -156,6 +161,173 @@ MonteCarlo::operator+=(ReporterPtr reporter) {
 }
 
 
+ThermostatPtr
+build_thermostat(string spec) {
+	std::regex fixed_pattern(
+			"([0-9.e+-]+)" 	    // A floating-point number (the temperature).
+	);
+	std::regex annealing_pattern(
+			"(?:"               // Optional argument.
+			"([0-9]+)x"         // An integer followed by 'x' (the number of cycles).
+			"\\s+"
+			")?"
+			"([0-9.e+-]+)"      // A floating point number (the high temperature).
+			"\\s*"
+			"=>"                // An arrow.
+			"\\s*"
+			"([0-9.e+-]+)"      // A floating point number (the low temperature).
+	);
+	std::regex auto_scaling_pattern(
+			"auto"
+			"(?:"						    // Optional argument.
+			"\\s+"
+			"([0-9.]+)%"        // A percentage (the target acceptance rate).
+				"(?:"         
+				"\\s+"
+				"([0-9]+)"        // An integer (the training period).
+					"(?:"
+					"\\s+"
+					"([0-9.e+-]+)"  // A floating point number (the initial temperature).
+					")?"
+				")?"
+			")?"
+	);
+
+	std::smatch match;
+
+	if(std::regex_match(spec, match, fixed_pattern)) {
+		double temperature = stod(match[1]);
+		return make_shared<FixedThermostat>(temperature);
+	}
+
+	if(std::regex_match(spec, match, annealing_pattern)) {
+		int num_cycles = stoi(match[1].length()? match[1].str() : "1");
+		double high_temp = stod(match[2]);
+		double low_temp = stod(match[3]);
+		return make_shared<AnnealingThermostat>(num_cycles, high_temp, low_temp);
+	}
+
+	if(std::regex_match(spec, match, auto_scaling_pattern)) {
+		double accept_rate = stod(match[1].length()? match[1].str() : "50") / 100;
+		int training_period = stod(match[2].length()? match[2].str() : "100");
+		double initial_temp = stod(match[3].length()? match[3].str() : "1");
+		return make_shared<AutoScalingThermostat>(
+				accept_rate, training_period, initial_temp);
+	}
+
+	throw (f("can't make a thermostat from '%s'") % spec).str();
+}
+
+
+FixedThermostat::FixedThermostat(double temperature):
+	my_temperature(temperature) {}
+
+double
+FixedThermostat::adjust(MonteCarloStep const & step) {
+	return my_temperature;
+}
+
+double
+FixedThermostat::temperature() const {
+	return my_temperature;
+}
+
+void
+FixedThermostat::temperature(double value) {
+	my_temperature = value;
+}
+
+
+AnnealingThermostat::AnnealingThermostat(
+		int num_cycles, double max_temperature, double min_temperature):
+
+	my_num_cycles(num_cycles),
+	my_max_temperature(max_temperature),
+	my_min_temperature(min_temperature) {}
+
+double
+AnnealingThermostat::adjust(MonteCarloStep const &step) {
+	int N = step.num_steps / my_num_cycles;
+	int i = step.i;
+	double T_hi = my_max_temperature;
+	double T_lo = my_min_temperature;
+	return ((T_lo - T_hi) / N) * (i % N) + T_hi;
+}
+
+int
+AnnealingThermostat::num_cycles() const {
+	return my_num_cycles;
+}
+
+void
+AnnealingThermostat::num_cycles(int value) {
+	my_num_cycles = value;
+}
+
+double
+AnnealingThermostat::min_temperature() const {
+	return my_min_temperature;
+}
+
+void
+AnnealingThermostat::min_temperature(double value) {
+	my_min_temperature = value;
+}
+
+double
+AnnealingThermostat::max_temperature() const {
+	return my_max_temperature;
+}
+
+void
+AnnealingThermostat::max_temperature(double value) {
+	my_max_temperature = value;
+}
+
+
+AutoScalingThermostat::AutoScalingThermostat(
+		double target_acceptance_rate,
+		unsigned training_period,
+		double initial_temperature):
+
+	my_temperature(initial_temperature),
+	my_target_acceptance_rate(target_acceptance_rate),
+	my_training_period(training_period),
+	my_training_set() {}
+
+double
+AutoScalingThermostat::adjust(MonteCarloStep const &step) {
+	// Add the new score difference to the training set.
+	my_training_set.push_back(step.score_diff);
+
+	// Once we've acquired a certain amount of training data, calculate a new 
+	// temperature by finding the median score difference and solving for the 
+	// temperature that would give the target acceptance rate.
+	if(my_training_set.size() >= my_training_period) {
+		int n = my_training_set.size() / 2;
+		nth_element(
+				my_training_set.begin(),
+				my_training_set.begin() + n,
+				my_training_set.end());
+		my_temperature = std::max(
+				my_training_set[n] / log(my_target_acceptance_rate), 0.0);
+		my_training_set.clear();
+	}
+
+	return my_temperature;
+}
+
+void
+AutoScalingThermostat::initial_temperature(double value) {
+	my_temperature = value;
+}
+
+void
+AutoScalingThermostat::training_period(unsigned value) {
+	my_training_period = value;
+}
+
+
 void
 ProgressReporter::update(MonteCarloStep const &step) {
 	// Print a progress bar if the program is running in a TTY.
@@ -181,7 +353,7 @@ CsvTrajectoryReporter::start(MonteCarloStep const & step) {
 	my_csv << "current_score\t";
 	my_csv << "proposed_score\t";
 	my_csv << "score_diff\t";
-	my_csv << "beta\t";
+	my_csv << "temperature\t";
 	my_csv << "metropolis_criterion\t";
 	my_csv << "random_threshold\t";
 	my_csv << "move\t";
@@ -204,7 +376,7 @@ CsvTrajectoryReporter::update(MonteCarloStep const &step) {
 	my_csv << step.current_score << "\t";
 	my_csv << step.proposed_score << "\t";
 	my_csv << step.score_diff << "\t";
-	my_csv << step.beta << "\t";
+	my_csv << step.temperature << "\t";
 	my_csv << step.metropolis_criterion << "\t";
 	my_csv << step.random_threshold << "\t";
 	my_csv << step.move->name() << "\t";

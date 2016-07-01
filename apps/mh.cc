@@ -32,10 +32,12 @@ Options:
     The number of moves to attempt in the design simulation.  I haven't yet 
     determined how many moves are required to reach convergence.
     
-  -k --kt <beta>                 [default: 5.0]
-    The likelihood of accepting a negative move.  If kT=0, only positive moves 
-    will be accepted.  In the limit that kT=inf, every move will be accepted.  
-    This parameter should be tuned to the magnitude of the score function.
+  -T --temperature <schedule>    [default: 5.0]
+    The temperature to use for the Metropolis criterion, which affects the 
+    likelihood of accepting a negative move.  If T=0, only positive moves will 
+    be accepted.  In the limit that T=inf, every move will be accepted.  You 
+    can either specify a fixed temperature (e.g. "5") or a multi-cooled 
+    simulated annealing schedule (e.g. "5x 10=>0").
     
   -r --random-seed <seed>        [default: 0]
     The seed for the random number generator.  If running in parallel, this 
@@ -197,14 +199,16 @@ int main(int argc, char **argv) {
 	ConstructPtr wt = mh->copy();
 	ScoreFunctionPtr scorefxn = build_mh_scorefxn(ScorefxnEnum::GENERAL);
 	MonteCarloPtr sampler = build_mh_sampler(wt);
-	ReporterPtr reporter = make_shared<CsvTrajectoryReporter>(
+	ThermostatPtr thermostat = build_thermostat(
+			args["--temperature"].asString());
+	ReporterPtr traj_reporter = make_shared<CsvTrajectoryReporter>(
 			args["--output"].asString());
 	std::mt19937 rng(stoi(args["--random-seed"].asString()));
 
-	sampler->scorefxn(scorefxn);
 	sampler->num_steps(stoi(args["--num-moves"].asString()));
-	sampler->beta(stod(args["--kt"].asString()));
-	sampler->add_reporter(reporter);
+	sampler->thermostat(thermostat);
+	sampler->scorefxn(scorefxn);
+	sampler->add_reporter(traj_reporter);
 
 	mh = sampler->apply(mh, rng);
 

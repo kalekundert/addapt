@@ -15,9 +15,9 @@ outcome_percents = 100 * outcome_counts / sum(outcome_counts)
 
 print("Outcome   Score        Freq")
 print("───────────────────────────")
-print("accepted  improved   {:5.2f}%".format(outcome_percents['ACCEPT_IMPROVED']))
-print("          unchanged  {:5.2f}%".format(outcome_percents['ACCEPT_UNCHANGED']))
-print("          worsened   {:5.2f}%".format(outcome_percents['ACCEPT_WORSENED']))
-print("rejected             {:5.2f}%".format(outcome_percents['REJECT']))
+print("accepted  improved   {:5.2f}%".format(outcome_percents.get('ACCEPT_IMPROVED',0)))
+print("          unchanged  {:5.2f}%".format(outcome_percents.get('ACCEPT_UNCHANGED',0)))
+print("          worsened   {:5.2f}%".format(outcome_percents.get('ACCEPT_WORSENED',0)))
+print("rejected             {:5.2f}%".format(outcome_percents.get('REJECT',0)))
 
 

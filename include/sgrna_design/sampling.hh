@@ -8,6 +8,7 @@
 
 #include <sgrna_design/model.hh>
 #include <sgrna_design/scoring.hh>
+#include <sgrna_design/utils.hh>
 
 namespace sgrna_design {
 
@@ -18,6 +19,9 @@ class Move;
 using MovePtr = std::shared_ptr<Move>;
 using MoveList = std::vector<MovePtr>;
 
+class Thermostat;
+using ThermostatPtr = std::shared_ptr<Thermostat>;
+
 class Reporter;
 using ReporterPtr = std::shared_ptr<Reporter>;
 using ReporterList = std::vector<ReporterPtr>;
@@ -26,21 +30,11 @@ class MonteCarlo {
 
 public:
 
-	/// @brief Default constructor with optional beta, num_steps, and score 
-	/// function arguments.
-	MonteCarlo(
-			double beta=1,
-			int num_steps=1000,
-			ScoreFunctionPtr=std::make_shared<ScoreFunction>());
+	/// @brief Default constructor.
+	MonteCarlo();
 
 	/// @brief Perform the Monte Carlo design simulation.
 	ConstructPtr apply(ConstructPtr, std::mt19937 &) const;
-
-	/// @brief Return the factor that controls how often moves are accepted.
-	double beta() const;
-
-	/// @brief Set the factor that controls how often moves are accepted.
-	void beta(double);
 
 	/// @brief Return the number of moves that will be tried during the 
 	/// simulation.
@@ -48,6 +42,14 @@ public:
 
 	/// @brief Set the number of moves that will be tried during the simulation.
 	void num_steps(int);
+
+	/// @brief Return the object responsible for setting the "temperature" of the 
+	/// Metropolis criterion.
+	ThermostatPtr thermostat() const;
+
+	/// @brief Set the object responsible for setting the "temperature" of the 
+	/// Metropolis criterion.
+	void thermostat(ThermostatPtr);
 
 	/// @brief Return the score function.
 	ScoreFunctionPtr scorefxn() const;
@@ -75,8 +77,8 @@ public:
 
 	private:
 
-		double my_beta;
 		int my_steps;
+		ThermostatPtr my_thermostat;
 		ScoreFunctionPtr my_scorefxn;
 		MoveList my_moves;
 		ReporterList my_reporters;
@@ -95,10 +97,91 @@ struct MonteCarloStep {
 	ConstructPtr current_sgrna, proposed_sgrna;
 	MovePtr move;
 	double current_score, proposed_score, score_diff;
-	double beta, metropolis_criterion, random_threshold;
+	double temperature, metropolis_criterion, random_threshold;
 	OutcomeEnum outcome;
 	std::map<OutcomeEnum,int> outcome_counters;
 };
+
+
+class Thermostat {
+
+public:
+
+	virtual double adjust(MonteCarloStep const &) = 0;
+
+};
+
+class FixedThermostat : public Thermostat {
+
+public:
+
+	FixedThermostat(double);
+
+	double adjust(MonteCarloStep const &);
+
+	double temperature() const;
+
+	void temperature(double);
+
+private:
+
+	double my_temperature;
+
+};
+
+class AnnealingThermostat : public Thermostat {
+
+public:
+
+	AnnealingThermostat(int, double, double);
+
+	double adjust(MonteCarloStep const &);
+
+	int num_cycles() const;
+
+	void num_cycles(int);
+
+	double max_temperature() const;
+
+	void max_temperature(double);
+
+	double min_temperature() const;
+
+	void min_temperature(double);
+
+private:
+
+	int my_num_cycles;
+	double my_max_temperature;
+	double my_min_temperature;
+
+};
+
+class AutoScalingThermostat : public Thermostat {
+
+public:
+
+	AutoScalingThermostat(double=0.5, unsigned=100, double=1.0);
+
+	double adjust(MonteCarloStep const &);
+
+	void initial_temperature(double);
+
+	void target_acceptance_rate(double);
+
+	void training_period(unsigned);
+
+private:
+
+	double my_temperature;
+	double my_target_acceptance_rate;
+	unsigned my_training_period;
+	vector<double> my_training_set;
+
+};
+
+ThermostatPtr
+build_thermostat(string spec);
 
 
 class Reporter {
@@ -135,15 +218,6 @@ private:
 
 	string my_path;
 	std::ofstream my_csv;
-};
-
-
-class Thermostat {
-
-public:
-
-	virtual double beta(MonteCarloStep const &) = 0;
-
 };
 
 

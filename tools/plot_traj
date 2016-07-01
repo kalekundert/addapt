@@ -10,6 +10,9 @@ import tango
 import pandas as pd
 from pylab import *
 
+from os import fork
+if fork(): raise SystemExit
+
 args = docopt.docopt(__doc__)
 for i, tsv_path in enumerate(args['<trajectories>']):
     traj = pd.read_table(tsv_path)
@@ -22,7 +25,7 @@ for i, tsv_path in enumerate(args['<trajectories>']):
     #legend(loc='best')
 
     subplot(2, 1, 2, sharex=gca())
-    plot(traj['step'], 1/traj['beta'], color=color)
+    plot(traj['step'], traj['temperature'], color=color)
     xlabel('Step')
     ylabel('Temperature')
 
