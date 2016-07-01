@@ -48,7 +48,7 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 
 	for(step.i = 0; step.i < step.num_steps; step.i++) {
 		// Copy the sgRNA so we can easily undo the move.
-		step.proposed_sgrna = sgrna->copy();
+		step.proposed_sgrna = step.current_sgrna->copy();
 
 		// Randomly pick a move to apply.
 		step.move = my_moves[randmove()];
