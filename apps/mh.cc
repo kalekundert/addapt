@@ -28,14 +28,22 @@ Usage:
   mh [options]
 
 Options:
-  -n --num-moves=<num>    [default: 100]
-    The number of moves to attempt in the Monte Carlo simulation.  I haven't 
-    yet determined how many moves are required to reach convergence.
+  -n --num-moves <num>           [default: 100]
+    The number of moves to attempt in the design simulation.  I haven't yet 
+    determined how many moves are required to reach convergence.
     
-  -k --kt=<beta>          [default: 5.0]
+  -k --kt <beta>                 [default: 5.0]
     The likelihood of accepting a negative move.  If kT=0, only positive moves 
     will be accepted.  In the limit that kT=inf, every move will be accepted.  
     This parameter should be tuned to the magnitude of the score function.
+    
+  -r --random-seed <seed>        [default: 0]
+    The seed for the random number generator.  If running in parallel, this 
+    should be different for each job.
+    
+  -o --output <path>             [default: mh.tsv]
+    The path where the trajectory of the design simulation will be saved.  This 
+    trajectory includes score and sequences for every step of the simulation.
     
   -v --version
     Display the version of ``mh`` being used.
@@ -189,16 +197,14 @@ int main(int argc, char **argv) {
 	ConstructPtr wt = mh->copy();
 	ScoreFunctionPtr scorefxn = build_mh_scorefxn(ScorefxnEnum::GENERAL);
 	MonteCarloPtr sampler = build_mh_sampler(wt);
-	ReporterPtr reporter = make_shared<CsvTrajectoryReporter>("mh.tsv");
-	std::mt19937 rng;
+	ReporterPtr reporter = make_shared<CsvTrajectoryReporter>(
+			args["--output"].asString());
+	std::mt19937 rng(stoi(args["--random-seed"].asString()));
 
 	sampler->scorefxn(scorefxn);
 	sampler->num_steps(stoi(args["--num-moves"].asString()));
 	sampler->beta(stod(args["--kt"].asString()));
 	sampler->add_reporter(reporter);
-
-	//std::myclock::duration secs = myclock::now() - std::beginning;
-	//std::mt19937 rng (secs.count());
 
 	mh = sampler->apply(mh, rng);
 
