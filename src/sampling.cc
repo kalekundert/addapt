@@ -362,10 +362,10 @@ TsvTrajectoryReporter::start(MonteCarloStep const & step) {
 	my_tsv << "outcome\t";
 
 	for(auto domain: step.current_sgrna->domains()) {
-		my_tsv << "current_" << domain->name() << "\t";
+		my_tsv << f("current_domain[%s]") % domain->name() << "\t";
 	}
 	for(auto domain: step.current_sgrna->domains()) {
-		my_tsv << "proposed_" << domain->name() << "\t";
+		my_tsv << f("proposed_domain[%s]") % domain->name() << "\t";
 	}
 	
 	my_tsv << std::endl;
