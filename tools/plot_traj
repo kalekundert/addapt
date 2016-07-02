@@ -10,6 +10,7 @@ import docopt
 import tango
 import pandas as pd
 from pylab import *
+from pprint import pprint
 
 from os import fork
 if fork(): raise SystemExit
@@ -17,15 +18,37 @@ if fork(): raise SystemExit
 args = docopt.docopt(__doc__)
 trajectories = args['<trajectories>'] or ['logs/mh.tsv']
 
+def find_peaks(scores, window=200):
+    scores = array(scores)
+    w = window // 2
+    BLOCKED = -1
+    peaks = []
+
+    while max(scores) > 0:
+        i = argmax(scores)
+        region = slice(max(i-w,0), min(i+w,len(scores)))
+
+        if not any(scores[region] == BLOCKED):
+            peaks.append(i)
+
+        scores[region] = BLOCKED
+
+    return peaks
+
+
+
 for i, tsv_path in enumerate(trajectories):
     traj = pd.read_table(tsv_path)
     color = tango.color_from_cycle(i)
 
     subplot(2, 1, 1)
     plot(traj['step'], traj['current_score'], label="Current Score", color=color)
-    plot(traj['step'], traj['proposed_score'], label="Proposed Score", color=color, linestyle=':')
+    #plot(traj['step'], traj['proposed_score'], label="Proposed Score", color=color, linestyle=':')
     ylabel('Score')
-    #legend(loc='best')
+
+    peaks = find_peaks(traj['current_score']);
+    for i in peaks:
+        axvline(traj['step'][i], color=tango.red[1], zorder=0)
 
     subplot(2, 1, 2, sharex=gca())
     plot(traj['step'], traj['temperature'], color=color)
