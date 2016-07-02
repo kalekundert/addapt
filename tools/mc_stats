@@ -2,14 +2,14 @@
 
 """\
 Usage:
-    mc_stats <trajectory.tsv>
+    mc_stats [<trajectory.tsv>]
 """
 
 import docopt
 import pandas as pd
 
 args = docopt.docopt(__doc__)
-trajectory = pd.read_table(args['<trajectory.tsv>'])
+trajectory = pd.read_table(args['<trajectory.tsv>'] or 'logs/mh.tsv')
 outcome_counts = trajectory['outcome'].value_counts()
 outcome_percents = 100 * outcome_counts / sum(outcome_counts)
 
