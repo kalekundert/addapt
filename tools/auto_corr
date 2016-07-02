@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+
+"""\
+Usage:
+    auto_corr.py [<trajectory>] [options]
+
+Options:
+    -n --steps <steps>      [default: 500]
+        Calculate the auto-correlation for the given number of steps.
+
+    -d --discard <steps>    [default: 100]
+        Throw out the given number of steps from the beginning of the 
+        simulation to account for equilibration.
+"""
+
+import docopt
+import tango
+import pandas as pd
+from pylab import *
+from pprint import pprint
+
+from os import fork
+if fork(): raise SystemExit
+
+args = docopt.docopt(__doc__)
+traj = pd.read_table(args['<trajectory>'] or 'logs/mh.tsv')
+steps = int(args['--steps'])
+discard = int(args['--discard'])
+
+def autocorr(x, n=101):
+    return [_autocorr(x, k) for k in range(n)]
+
+def _autocorr(x, k):
+    N = len(x) - k
+    return sum(x[i+k] == x[i] for i in range(N)) / N
+
+
+domains = 'nexus/b', 'ruler', 'hairpin/a', 'hairpin/b'
+labels = []
+
+for i, domain in enumerate(domains):
+    seq_traj = traj['current_domain[%s]' % domain][discard:]
+    initial_seq = seq_traj.iloc[0]
+    color = tango.color_from_cycle(i)
+
+    for pos in range(len(initial_seq)):
+        pos_traj = [seq[pos] for seq in seq_traj]
+        lines = plot(autocorr(pos_traj, steps+1), color=color)
+
+        if pos == 0:
+            labels.append((lines[0], domain))
+
+
+legend(*zip(*labels), loc='best')
+
+show()
