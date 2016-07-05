@@ -209,7 +209,7 @@ class TsvTrajectoryReporter : public Reporter {
 
 public:
 
-	TsvTrajectoryReporter(string);
+	TsvTrajectoryReporter(string, int);
 
 	void start(MonteCarloStep const &);
 	void update(MonteCarloStep const &);
@@ -218,6 +218,7 @@ public:
 private:
 
 	string my_path;
+	int my_interval;
 	std::ofstream my_tsv;
 };
 

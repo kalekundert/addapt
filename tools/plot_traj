@@ -40,17 +40,19 @@ if fork(): raise SystemExit
 subplot(2, 1, 1)
 plot_best_scores()
 plot(traj['step'], traj['current_score'], color=tango.blue[2])
-ylabel('Score')
+title(args['<trajectory>'])
+ylabel('score')
 
 # Plot the temperature over time.
 subplot(2, 1, 2, sharex=gca())
 plot_best_scores()
 plot(traj['step'], traj['temperature'], color=tango.blue[2])
-xlabel('Step')
-ylabel('Temperature')
+xlabel('step')
+ylabel('temperature')
 
 # Display the plot.
-gcf().canvas.set_window_title(' '.join(sys.argv))
+gcf().canvas.set_window_title('{}: {}'.format(
+    sys.argv[0], args['<trajectory>']))
 tight_layout()
 show()
 

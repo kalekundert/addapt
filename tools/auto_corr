@@ -23,7 +23,8 @@ from os import fork
 if fork(): raise SystemExit
 
 args = docopt.docopt(__doc__)
-traj = pd.read_table(args['<trajectory>'] or 'logs/mh.tsv')
+traj_name = args['<trajectory>'] or 'logs/mh.tsv'
+traj = pd.read_table(traj_name)
 steps = int(args['--steps'])
 discard = int(args['--discard'])
 
@@ -50,7 +51,11 @@ for i, domain in enumerate(domains):
         if pos == 0:
             labels.append((lines[0], domain))
 
+title(traj_name)
+xlabel("step")
+ylabel("auto-correlation")
 
 legend(*zip(*labels), loc='best')
-
+gcf().canvas.set_window_title('{}: {}'.format(sys.argv[0], traj_name))
+tight_layout()
 show()

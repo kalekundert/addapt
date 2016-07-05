@@ -48,6 +48,9 @@ Options:
     The path where the trajectory of the design simulation will be saved.  This 
     trajectory includes scores and sequences for every step of the simulation.
     
+  -i --output-interval <steps>   [default: 1]
+    How often a new snapshot in the trajectory should be recorded.
+    
   -v --version
     Display the version of ``mh`` being used.
     
@@ -173,7 +176,7 @@ build_mh_scorefxn(
 					ConditionEnum::HOLO,
 					{"hairpin/a"},
 					{"hairpin/b"},
-					2.0
+					1.0
 			));
 
 			// Desired fold *with and without* ligand.
@@ -222,7 +225,8 @@ int main(int argc, char **argv) {
 				args["--temperature"].asString());
 		ReporterPtr progress_bar = make_shared<ProgressReporter>();
 		ReporterPtr traj_reporter = make_shared<TsvTrajectoryReporter>(
-				args["--output"].asString());
+				args["--output"].asString(),
+				stoi(args["--output-interval"].asString()));
 		std::mt19937 rng(stoi(args["--random-seed"].asString()));
 
 		sampler->num_steps(stoi(args["--num-moves"].asString()));
