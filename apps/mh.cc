@@ -62,38 +62,6 @@ enum class ScorefxnEnum {
 
 
 ConstructPtr
-build_rhf_6_sgrna() {
-	ColorEnum GREEN = ColorEnum::GREEN;
-	ColorEnum RED = ColorEnum::RED;
-	ColorEnum MAGENTA = ColorEnum::MAGENTA;
-	ColorEnum BLUE = ColorEnum::BLUE;
-	ColorEnum YELLOW = ColorEnum::YELLOW;
-	StyleEnum BOLD = StyleEnum::BOLD;
-
-	ConstructPtr sgrna = make_shared<Construct>();
-
-	*sgrna += make_shared<Domain>("spacer", "");
-	*sgrna += make_shared<Domain>("lower_stem/a", "guuuua", GREEN);
-	*sgrna += make_shared<Domain>("bulge/a", "ga", GREEN);
-	*sgrna += make_shared<Domain>("upper_stem/a", "gcua", GREEN);
-	*sgrna += make_shared<Domain>("upper_stem/b", "gaaa", GREEN);
-	*sgrna += make_shared<Domain>("upper_stem/c", "uagc", GREEN);
-	*sgrna += make_shared<Domain>("bulge/b", "aagu", GREEN);
-	*sgrna += make_shared<Domain>("lower_stem/b", "uaaaau", GREEN);
-	*sgrna += make_shared<Domain>("nexus/a", "aa", RED);
-	*sgrna += make_shared<Domain>("nexus/b", "gg", RED);
-	*sgrna += make_shared<Domain>("nexus/c", "cuagu", RED, BOLD);
-	*sgrna += make_shared<Domain>("nexus/d", "cc", RED);
-	*sgrna += make_shared<Domain>("ruler", "CuUUUC", MAGENTA, BOLD);
-	*sgrna += make_shared<Domain>("hairpin/a", "GCC", BLUE, BOLD);
-	*sgrna += make_shared<Domain>("aptamer", "gauaccagccgaaaggcccuuggcagc", YELLOW);
-	*sgrna += make_shared<Domain>("hairpin/b", "GAC", BLUE, BOLD);
-	*sgrna += make_shared<Domain>("tail", "ggcaccgagucggugcuuuuuu", BLUE);
-
-	return sgrna;
-}
-
-ConstructPtr
 build_mh_sgrna() {
 	ColorEnum GREEN = ColorEnum::GREEN;
 	ColorEnum RED = ColorEnum::RED;
@@ -226,7 +194,6 @@ int main(int argc, char **argv) {
 			USAGE+1, {argv + 1, argv + argc}, true, "0.0");
 
 	ConstructPtr mh = build_mh_sgrna();
-	ConstructPtr rhf_6 = build_rhf_6_sgrna();
 	ConstructPtr wt = mh->copy();
 	ScoreFunctionPtr scorefxn = build_mh_scorefxn(ScorefxnEnum::SPECIFIC);
 	MonteCarloPtr sampler = build_mh_sampler(wt);
