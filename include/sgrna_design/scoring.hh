@@ -4,6 +4,11 @@
 #include <memory>
 #include <vector>
 
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/random_access_index.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/mem_fun.hpp>
+
 extern "C" {
   #include <ViennaRNA/data_structures.h>
 }
@@ -14,6 +19,9 @@ namespace sgrna_design {
 
 class ScoreFunction;
 using ScoreFunctionPtr = std::shared_ptr<ScoreFunction>;
+
+ struct EvaluatedScoreTerm { string name; double weight, term; };
+using EvaluatedScoreFunction = std::vector<EvaluatedScoreTerm>;
 
 class ScoreTerm;
 using ScoreTermPtr = std::shared_ptr<ScoreTerm>;
@@ -29,24 +37,6 @@ enum class ConditionEnum {
 	HOLO,
 };
 
-
-class ScoreFunction {
-
-public:
-
-	/// @brief Default constructor.
-	ScoreFunction();
-
-	/// @brief Add a term to this score function.
-	void operator+=(ScoreTermPtr);
-
-	/// @brief Calculate a score for the given construct.
-	double evaluate(ConstructPtr) const;
-
-private:
-	ScoreTermList my_terms;
-
-};
 
 /// @brief The interface to RNA secondary structure predictions.
 class RnaFold {
@@ -88,15 +78,43 @@ private:
 };
 
 
-class ScoreTerm {
+class ScoreFunction {
 
 public:
 
 	/// @brief Default constructor.
-	ScoreTerm();
+	ScoreFunction();
 
-	/// @brief Initialize the score term with a weight.
-	ScoreTerm(double);
+	/// @brief Add a term to this score function.
+	void add_term(ScoreTermPtr);
+
+	/// @brief Add a term to this score function.
+	void operator+=(ScoreTermPtr);
+
+	/// @brief Calculate a score for the given construct.
+	double evaluate(ConstructConstPtr) const;
+
+	/// @brief Calculate a score for the given construct and fill in a table 
+	/// containing the name, weight, and value of each score term.
+	double evaluate(ConstructConstPtr, EvaluatedScoreFunction &) const;
+
+private:
+	ScoreTermList my_terms;
+
+};
+
+class ScoreTerm {
+
+public:
+
+	/// @brief Optionally initialize the score term with a name and a weight.
+	ScoreTerm(string="", double=1.0);
+
+	/// @brief Return this score term's name.
+	string name() const;
+
+	/// @brief Set this score term's name.
+	void name(string);
 
 	/// @brief Return this score term's weight.
 	double weight() const;
@@ -110,6 +128,7 @@ public:
 
 private:
 
+	string my_name;
 	double my_weight;
 
 };
@@ -119,7 +138,7 @@ class LigandSensitivityTerm : public ScoreTerm {
 public:
 
 	LigandSensitivityTerm(
-			vector<string>, double=1.0);
+			string, vector<string>, double=1.0);
 
 	double evaluate(
 			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
@@ -130,12 +149,12 @@ private:
 
 };
 
-class SpecificLigandSensitivityTerm : public ScoreTerm {
+class ConditionallyPairedTerm : public ScoreTerm {
 
 public:
 
-	SpecificLigandSensitivityTerm(
-			ConditionEnum, vector<string>, vector<string>, double=1.0);
+	ConditionallyPairedTerm(
+			string, ConditionEnum, vector<string>, vector<string>, double=1.0);
 
 	double evaluate(
 			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
@@ -146,8 +165,60 @@ private:
 	vector<string> my_selection;
 	vector<string> my_targets;
 
+};
+
+class ConditionallyUnpairedTerm : public ScoreTerm {
+
+public:
+
+	ConditionallyUnpairedTerm(
+			string, ConditionEnum, vector<string>, double=1.0);
+
+	double evaluate(
+			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+
+private:
+
+	ConditionEnum my_condition;
+	vector<string> my_selection;
 
 };
+
+class AlwaysPairedTerm : public ScoreTerm {
+
+public:
+
+	AlwaysPairedTerm(
+			string, vector<string>, vector<string>, double=1.0);
+
+	double evaluate(
+			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+
+private:
+
+	ConditionEnum my_condition;
+	vector<string> my_selection;
+	vector<string> my_targets;
+
+};
+
+class AlwaysUnpairedTerm : public ScoreTerm {
+
+public:
+
+	AlwaysUnpairedTerm(
+			string, vector<string>, double=1.0);
+
+	double evaluate(
+			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+
+private:
+
+	ConditionEnum my_condition;
+	vector<string> my_selection;
+
+};
+
 
 }
 

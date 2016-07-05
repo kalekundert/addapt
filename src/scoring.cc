@@ -13,28 +13,6 @@ extern "C" {
 
 namespace sgrna_design {
 
-ScoreFunction::ScoreFunction() {}
-
-void 
-ScoreFunction::operator+=(ScoreTermPtr term) {
-	my_terms.push_back(term);
-}
-
-double
-ScoreFunction::evaluate(ConstructPtr sgrna) const {
-	ViennaRnaFold apo_fold(sgrna, LigandEnum::NONE);
-	ViennaRnaFold holo_fold(sgrna, LigandEnum::THEO);
-
-	double score = 0;
-
-	for(ScoreTermPtr term: my_terms) {
-		score += term->weight() * term->evaluate(sgrna, apo_fold, holo_fold);
-	}
-
-	return score;
-}
-
-
 ViennaRnaFold::ViennaRnaFold(ConstructConstPtr sgrna, LigandEnum ligand):
 
 	my_sgrna(sgrna),
@@ -102,9 +80,59 @@ ViennaRnaFold::base_pair_prob(int a, int b) const {
 }
 	
 
-ScoreTerm::ScoreTerm() : ScoreTerm(0) {}
+ScoreFunction::ScoreFunction() {}
 
-ScoreTerm::ScoreTerm(double weight) : my_weight(weight) {}
+void 
+ScoreFunction::add_term(ScoreTermPtr term) {
+	my_terms.push_back(term);
+}
+
+void 
+ScoreFunction::operator+=(ScoreTermPtr term) {
+	add_term(term);
+}
+
+double
+ScoreFunction::evaluate(ConstructConstPtr sgrna) const {
+	EvaluatedScoreFunction table;
+	return evaluate(sgrna, table);
+}
+		
+double
+ScoreFunction::evaluate(
+		ConstructConstPtr sgrna,
+		EvaluatedScoreFunction &table) const {
+
+	ViennaRnaFold apo_fold(sgrna, LigandEnum::NONE);
+	ViennaRnaFold holo_fold(sgrna, LigandEnum::THEO);
+
+	double score = 0;
+	double evaluated_term;
+
+	table.clear();
+
+	for(ScoreTermPtr term: my_terms) {
+		evaluated_term = term->evaluate(sgrna, apo_fold, holo_fold);
+		score += term->weight() * evaluated_term;
+		table.push_back({term->name(), term->weight(), evaluated_term});
+	}
+
+	return score;
+}
+
+
+ScoreTerm::ScoreTerm(string name, double weight):
+	my_name(name), my_weight(weight) {}
+
+string
+ScoreTerm::name() const {
+	return my_name;
+}
+
+void
+ScoreTerm::name(string name) {
+	my_name = name;
+}
 
 double
 ScoreTerm::weight() const {
@@ -134,20 +162,44 @@ domains_to_indices(
 }
 
 
-// Score terms I might want
-// ========================
-// 1. RequiredBasePairing
+// All of these score terms have the same general form:
 //
-// 2. Rename SpecificLigandSensitivityTerm to ConditionalBasePairing
+// Sum[
+//  Prob{desired fold} × log(Enrichment{desired fold over undesired fold})
+// ]
 //
-// 3. Conditionally unpaired (i.e. to prevent misfolding the nexus).
+// A fold is a base pair for the "paired" score terms or an unpaired nucleotide 
+// for the "unpaired" score terms.  For the "conditional" score terms, the 
+// undesired fold is the same fold as the desired fold, but in the opposite 
+// condition (e.g. apo vs. holo).  For the "always" score terms, the undesired 
+// fold is anything that's not the desired fold, in the same condition.  So 
+// Prob{undesired fold} = 1 - Prob{desired fold}.
 //
+// You can think of the probability term as counting how many nucleotides have 
+// the desired fold.  You can think of the enrichment term as weighting that by 
+// how much more likely the desired fold is compared to the undesired fold.  
+// The logarithm is important because it allows the enrichments to be summed.
+//
+// In some cases, negative terms for undesired folds are included.  However, 
+// these can be confusing to look at, because you have to remember that the 
+// sign of the logarithm changes depending on which fold is more probable.  
+// Written fully out, these negative terms would look like:
+//
+// + Prob{desired fold} × | log(Enrichment{desired over undesired}) |
+// - Prob{undesired fold} × | log(Enrichment{undesired over desired}) |
+//
+// where |x| represents the absolute value of x.  It turns out that the above 
+// expression has a more succinct form:
+//
+// (Prob{desired fold} + Prob{undesired fold})
+//   × log(Enrichment{desired fold over undesired fold})
 
 LigandSensitivityTerm::LigandSensitivityTerm(
+		string name,
 		vector<string> selection,
 		double weight):
 
-	ScoreTerm(weight),
+	ScoreTerm(name, weight),
 	my_selection(selection) {
 
 	if(my_selection.empty()) {
@@ -191,13 +243,14 @@ LigandSensitivityTerm::evaluate(
 }
 
 
-SpecificLigandSensitivityTerm::SpecificLigandSensitivityTerm(
+ConditionallyPairedTerm::ConditionallyPairedTerm(
+		string name,
 		ConditionEnum condition,
 		vector<string> selection,
 		vector<string> targets,
 		double weight):
 
-	ScoreTerm(weight),
+	ScoreTerm(name, weight),
 	my_condition(condition),
 	my_selection(selection),
 	my_targets(targets) {
@@ -208,7 +261,7 @@ SpecificLigandSensitivityTerm::SpecificLigandSensitivityTerm(
 }
 
 double
-SpecificLigandSensitivityTerm::evaluate(
+ConditionallyPairedTerm::evaluate(
 		ConstructConstPtr sgrna,
 		RnaFold const &apo_fold,
 		RnaFold const &holo_fold) const {
@@ -224,13 +277,24 @@ SpecificLigandSensitivityTerm::evaluate(
 			p_apo = apo_fold.base_pair_prob(i, j);
 			p_holo = holo_fold.base_pair_prob(i, j);
 
+			// The calculation below obscures the meaning of the score term.  I think 
+			// the meaning is easier to see if you keep the following (mathematically 
+			// equivalent) expression in mind:
+			//
+			// + Prob{paired, right condition} × log(Enrichment{right condition})
+			// - Prob{paired, wrong condition} × log(Enrichment{wrong condition}),
+			//
+			// where Enrichment is how much more likely the nucleotide is to be 
+			// paired with the relevant partner in the given condition. The logarithm 
+			// is important because it allows us to sum these sub-expressions.
+
 			if(p_apo > 0 and p_holo > 0) {
 				switch(my_condition) {
 					case ConditionEnum::APO:
-						sensitivity += p_apo * log(p_apo / p_holo);
+						sensitivity += (p_apo + p_holo) * log(p_apo / p_holo);
 						break;
 					case ConditionEnum::HOLO:
-						sensitivity += p_holo * log(p_holo / p_apo);
+						sensitivity += (p_holo + p_apo) * log(p_holo / p_apo);
 						break;
 				}
 			}
@@ -238,9 +302,179 @@ SpecificLigandSensitivityTerm::evaluate(
 	}
 
 	return sensitivity / selection_indices.size();
-
-
 }
+
+
+ConditionallyUnpairedTerm::ConditionallyUnpairedTerm(
+		string name,
+		ConditionEnum condition,
+		vector<string> selection,
+		double weight):
+
+	ScoreTerm(name, weight),
+	my_condition(condition),
+	my_selection(selection) {
+
+	if(my_selection.empty()) {
+		throw "cannot score empty selection";
+	}
+}
+
+double
+ConditionallyUnpairedTerm::evaluate(
+		ConstructConstPtr sgrna,
+		RnaFold const &apo_fold,
+		RnaFold const &holo_fold) const {
+
+	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
+
+	double sensitivity = 0;
+
+	for(int i: selection_indices) {
+		double p_apo = 1;   // Probability that nucleotide ``i`` is unpaired
+		double p_holo = 1;  // in the given condition.
+
+		for(int j = 0; j < sgrna->len(); j++) {
+			p_apo -= apo_fold.base_pair_prob(i, j);
+			p_holo -= holo_fold.base_pair_prob(i, j);
+		}
+
+		// The calculation below obscures the meaning of the score term.  I think 
+		// the meaning is easier to see if you keep the following (mathematically 
+		// equivalent) expression in mind:
+		//
+		// + Prob{unpaired, right condition} × log(Enrichment{right condition})
+		// - Prob{unpaired, wrong condition} × log(Enrichment{wrong condition}),
+		//
+		// where Enrichment is how much more likely the nucleotide is to be 
+		// unpaired in the given condition. The logarithm is important because it 
+		// allows us to sum these sub-expressions.
+
+		if(p_apo > 0 and p_holo > 0) {
+			switch(my_condition) {
+				case ConditionEnum::APO:
+					sensitivity += (p_apo + p_holo) * log(p_apo / p_holo);
+					break;
+				case ConditionEnum::HOLO:
+					sensitivity += (p_holo + p_apo) * log(p_holo / p_apo);
+					break;
+			}
+		}
+	}
+
+	return sensitivity / selection_indices.size();
+}
+
+
+AlwaysPairedTerm::AlwaysPairedTerm(
+		string name,
+		vector<string> selection,
+		vector<string> targets,
+		double weight):
+
+	ScoreTerm(name, weight),
+	my_selection(selection),
+	my_targets(targets) {
+	
+	if(my_selection.empty()) {
+		throw "cannot score empty selection";
+	}
+}
+
+double
+AlwaysPairedTerm::evaluate(
+		ConstructConstPtr sgrna,
+		RnaFold const &apo_fold,
+		RnaFold const &holo_fold) const {
+
+	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
+	vector<int> target_indices = domains_to_indices(sgrna, my_targets);
+
+	double sensitivity = 0;
+
+	for(int i: selection_indices) {
+		double p_apo = 0;    // Probability that nucleotide ``i`` is paired
+		double p_holo = 0;   // with any of its allowed partners.
+
+		for(int j: target_indices) {
+			p_apo += apo_fold.base_pair_prob(i, j);
+			p_holo += holo_fold.base_pair_prob(i, j);
+		}
+
+		// I think it's a little easier to understand what this score term does by 
+		// reading pseudo-math pseudo-code:
+		//
+		// Prob{paired correctly, apo}  * log(Enrichment{paired correctly, apo}) +
+		// Prob{paired correctly, holo} * log(Enrichment{paired correctly, holo}),
+		//
+		// where Enrichment is how much more likely the nucleotide is to be 
+		// correctly paired vs incorrectly paired in the given condition.  The 
+		// logarithm is important because it allows us to sum these expressions.
+
+		if(p_apo > 0 and p_apo < 1 and p_holo > 0 and p_holo < 1) {
+			sensitivity += p_apo * log(p_apo / (1 - p_apo));
+			sensitivity += p_holo * log(p_holo / (1 - p_holo));
+		}
+	}
+
+	// Divide by two because there are two positive terms associated with each 
+	// base pair, one for correctly forming in the apo condition and another for 
+	// the holo condition.
+
+	return sensitivity / selection_indices.size() / 2;
+}
+
+
+AlwaysUnpairedTerm::AlwaysUnpairedTerm(
+		string name,
+		vector<string> selection,
+		double weight):
+
+	ScoreTerm(name, weight),
+	my_selection(selection) {}
+
+double
+AlwaysUnpairedTerm::evaluate(
+		ConstructConstPtr sgrna,
+		RnaFold const &apo_fold,
+		RnaFold const &holo_fold) const {
+
+	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
+
+	if(selection_indices.empty()) {
+		return 0;
+	}
+
+	double sensitivity = 0;
+
+	for(int i: selection_indices) {
+		double p_apo = 1;    // Probability that nucleotide ``i`` is unpaired
+		double p_holo = 1;   // in the given condition.
+
+		for(int j = 0; j < sgrna->len(); j++) {
+			p_apo -= apo_fold.base_pair_prob(i, j);
+			p_holo -= holo_fold.base_pair_prob(i, j);
+		}
+
+		// I think it's a little easier to understand what this score term does by 
+		// reading pseudo-math pseudo-code:
+		//
+		// + Prob{unpaired, apo}  * log(Enrichment{unpaired over paired, apo})
+		// + Prob{unpaired, holo} * log(Enrichment{unpaired over paired, holo})
+
+		if(p_apo > 0 and p_apo < 1 and p_holo > 0 and p_holo < 1) {
+			sensitivity += p_apo * log(p_apo / (1 - p_apo));
+			sensitivity += p_holo * log(p_holo / (1 - p_holo));
+		}
+	}
+
+	// Divide by two because there are two positive terms associated with each 
+	// nucleotide, one for being unpaired in the apo condition and another for 
+	// the holo condition.
+
+	return sensitivity / selection_indices.size() / 2;
+}
+
 
 }
 

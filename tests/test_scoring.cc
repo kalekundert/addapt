@@ -240,7 +240,7 @@ TEST_CASE("Test the score function class", "[scoring]") {
 	public:
 
 		DummyTerm(double score, double weight):
-			ScoreTerm(weight), my_score(score) {}
+			ScoreTerm("dummy", weight), my_score(score) {}
 
 		double
 		evaluate(ConstructConstPtr, RnaFold const &, RnaFold const &) const {
@@ -283,7 +283,7 @@ TEST_CASE("Test the 'ligand sensitivity' score term", "[scoring]") {
 	DummyRnaFold dummy_apo_fold;
 	DummyRnaFold dummy_holo_fold;
 
-	dummy_apo_fold[{0,3}] = 0.10;
+	dummy_apo_fold[{0,3}] = 0.20;
 	dummy_holo_fold[{0,3}] = 0.40;
 
 	dummy_apo_fold[{1,2}] = 0.30;
@@ -303,14 +303,13 @@ TEST_CASE("Test the 'ligand sensitivity' score term", "[scoring]") {
 
 		// The score increases with the number of ligand-sensitive base pairs.
 		{{"a","b"}, (0.3-0.1)*log(3)/3},
-		{{"a","c"}, (0.4-0.1)*log(4)/3},
-		{{"a","b","c"}, (0.3-0.1)*log(3)/4 + (0.4-0.1)*log(4)/4}
+		{{"a","c"}, (0.4-0.2)*log(2)/3},
+		{{"a","b","c"}, (0.3-0.1)*log(3)/4 + (0.4-0.2)*log(2)/4}
 	};
 
-	// Make sure each scenario is scored correctly.
-
+	// Each scenario is scored correctly.
 	for(Test test: tests) {
-		LigandSensitivityTerm term(test.selection);
+		LigandSensitivityTerm term("dummy", test.selection);
 		double score = term.evaluate(
 				dummy_construct, dummy_apo_fold, dummy_holo_fold);
 
@@ -319,12 +318,11 @@ TEST_CASE("Test the 'ligand sensitivity' score term", "[scoring]") {
 	}
 
 	// You can't score empty selections.
-
-	CHECK_THROWS(LigandSensitivityTerm term({}));
+	CHECK_THROWS(LigandSensitivityTerm term("dummy", {}));
 
 }
 
-TEST_CASE("Test the 'specific ligand sensitivity' score term", "[scoring]") {
+TEST_CASE("Test the 'conditionally paired' score term", "[scoring]") {
 	// Make a construct with individually indexable nucleotides.
 	ConstructPtr dummy_construct = make_shared<Construct>();
 	*dummy_construct += make_shared<Domain>("a", "U");
@@ -336,7 +334,7 @@ TEST_CASE("Test the 'specific ligand sensitivity' score term", "[scoring]") {
 	DummyRnaFold dummy_apo_fold;
 	DummyRnaFold dummy_holo_fold;
 
-	dummy_apo_fold[{0,3}] = 0.10;
+	dummy_apo_fold[{0,3}] = 0.20;
 	dummy_holo_fold[{0,3}] = 0.40;
 
 	dummy_apo_fold[{1,2}] = 0.30;
@@ -344,66 +342,110 @@ TEST_CASE("Test the 'specific ligand sensitivity' score term", "[scoring]") {
 
 	// Define expected scores for various combinations of nucleotides.
 	struct Test {
-		ConditionEnum condition;
 		vector<string> selection;
 		vector<string> targets;
 		double expected_score;
 	};
 
 	vector<Test> tests = {
-		// The score is 0 if there aren't any base pairs.
-		{ConditionEnum::APO,  {"a"}, {}, 0},
-		{ConditionEnum::HOLO, {"a"}, {}, 0},
-		{ConditionEnum::APO,  {"a"}, {"a"}, 0},
-		{ConditionEnum::HOLO, {"a"}, {"a"}, 0},
-		{ConditionEnum::APO,  {"a"}, {"B"}, 0},
-		{ConditionEnum::HOLO, {"a"}, {"B"}, 0},
-		{ConditionEnum::APO,  {"b"}, {}, 0},
-		{ConditionEnum::HOLO, {"b"}, {}, 0},
-		{ConditionEnum::APO,  {"b"}, {"b"}, 0},
-		{ConditionEnum::HOLO, {"b"}, {"b"}, 0},
-		{ConditionEnum::APO,  {"b"}, {"A"}, 0},
-		{ConditionEnum::HOLO, {"b"}, {"A"}, 0},
-
 		// The score is proportional to the ligand sensitivity of the base pair.
-		{ConditionEnum::APO,  {"a"}, {"A"}, -0.1*log(4)},
-		{ConditionEnum::HOLO, {"a"}, {"A"},  0.4*log(4)},
-		{ConditionEnum::APO,  {"b"}, {"B"},  0.3*log(3)},
-		{ConditionEnum::HOLO, {"b"}, {"B"}, -0.1*log(3)},
+		{{"a"}, {"A"},  0.6*log(2)},
+		{{"b"}, {"B"}, -0.4*log(3)},
 
 		// The score is normalized by the number of nucleotides in the selection.
-		{ConditionEnum::APO,  {"a"},     {"A","B"}, -0.1*log(4)/1},
-		{ConditionEnum::HOLO, {"a"},     {"A","B"},  0.4*log(4)/1},
-		{ConditionEnum::APO,  {"b"},     {"A","B"},  0.3*log(3)/1},
-		{ConditionEnum::HOLO, {"b"},     {"A","B"}, -0.1*log(3)/1},
-		{ConditionEnum::APO,  {"a","b"}, {"A"},     -0.1*log(4)/2},
-		{ConditionEnum::HOLO, {"a","b"}, {"A"},      0.4*log(4)/2},
-		{ConditionEnum::APO,  {"a","b"}, {"B"},      0.3*log(3)/2},
-		{ConditionEnum::HOLO, {"a","b"}, {"B"},     -0.1*log(3)/2},
-		{ConditionEnum::APO,  {"a","b"}, {"A","B"}, -0.1*log(4)/2 +0.3*log(3)/2},
-		{ConditionEnum::HOLO, {"a","b"}, {"A","B"},  0.4*log(4)/2 -0.1*log(3)/2},
+		{{"a"},     {"A","B"},  0.6*log(2)/1},
+		{{"b"},     {"A","B"}, -0.4*log(3)/1},
+		{{"a","b"}, {"A"},      0.6*log(2)/2},
+		{{"a","b"}, {"B"},     -0.4*log(3)/2},
+		{{"a","b"}, {"A","B"},  0.6*log(2)/2 -0.4*log(3)/2},
+
+		// The score is 0 if there aren't any base pairs.
+		{{"a"}, {},    0},
+		{{"a"}, {"a"}, 0},
+		{{"a"}, {"B"}, 0},
+		{{"b"}, {},    0},
+		{{"b"}, {"b"}, 0},
+		{{"b"}, {"A"}, 0},
+
 	};
 
-	// Make sure each scenario is scored correctly.
-
+	// Each scenario is scored correctly in both the apo and holo conditions.
 	for(Test test: tests) {
-		SpecificLigandSensitivityTerm term(
-				test.condition, test.selection, test.targets);
-		double score = term.evaluate(
+		ConditionallyPairedTerm apo_term(
+				"dummy", ConditionEnum::APO, test.selection, test.targets);
+		ConditionallyPairedTerm holo_term(
+				"dummy", ConditionEnum::HOLO, test.selection, test.targets);
+
+		double apo_score = apo_term.evaluate(
+				dummy_construct, dummy_apo_fold, dummy_holo_fold);
+		double holo_score = holo_term.evaluate(
 				dummy_construct, dummy_apo_fold, dummy_holo_fold);
 
-		CAPTURE(test.condition);
 		CAPTURE(test.selection);
 		CAPTURE(test.targets);
 
-		CHECK(score == Approx(test.expected_score));
+		CHECK(apo_score == Approx(-test.expected_score));
+		CHECK(holo_score == Approx(test.expected_score));
 	}
 
 	// You can't score empty selections.
+	CHECK_THROWS(ConditionallyPairedTerm term(
+				"dummy", ConditionEnum::APO, {}, {"a"}));
+}
 
-	CHECK_THROWS(
-			SpecificLigandSensitivityTerm term(ConditionEnum::APO, {}, {"a"}));
+TEST_CASE("Test the 'conditionally unpaired' score term", "[scoring]") {
+	// Make a construct with individually indexable nucleotides.
+	ConstructPtr dummy_construct = make_shared<Construct>();
+	*dummy_construct += make_shared<Domain>("a", "U");
+	*dummy_construct += make_shared<Domain>("b", "U");
+	*dummy_construct += make_shared<Domain>("B", "U");
+	*dummy_construct += make_shared<Domain>("A", "U");
 
+	// Define fake base-pairing probabilities for this construct.
+	DummyRnaFold dummy_apo_fold;
+	DummyRnaFold dummy_holo_fold;
+
+	dummy_apo_fold[{0,3}]  = 0.8; // p_unpaired(0, apo)  = 0.2
+	dummy_holo_fold[{0,3}] = 0.6; // p_unpaired(0, holo) = 0.4
+
+	dummy_apo_fold[{1,2}]  = 0.6; // p_unpaired(1, apo)  = 0.3
+	dummy_apo_fold[{1,3}]  = 0.1;
+	dummy_holo_fold[{1,2}] = 0.6; // p_unpaired(1, holo) = 0.1
+	dummy_holo_fold[{1,3}] = 0.3;
+
+	// Define expected scores for various combinations of nucleotides.
+	struct Test {
+		vector<string> selection;
+		double expected_score;
+	};
+
+	vector<Test> tests = {
+		{{"a"},      0.6*log(2)},
+		{{"b"},     -0.4*log(3)},
+		{{"a","b"},  0.6*log(2)/2 -0.4*log(3)/2}
+	};
+
+	// Each scenario is scored correctly in both the apo and holo conditions.
+	for(Test test: tests) {
+		ConditionallyUnpairedTerm apo_term(
+				"dummy", ConditionEnum::APO, test.selection);
+		ConditionallyUnpairedTerm holo_term(
+				"dummy", ConditionEnum::HOLO, test.selection);
+
+		double apo_score = apo_term.evaluate(
+				dummy_construct, dummy_apo_fold, dummy_holo_fold);
+		double holo_score = holo_term.evaluate(
+				dummy_construct, dummy_apo_fold, dummy_holo_fold);
+
+		CAPTURE(test.selection);
+
+		CHECK(apo_score == Approx(-test.expected_score));
+		CHECK(holo_score == Approx(test.expected_score));
+	}
+
+	// You can't score empty selections.
+	CHECK_THROWS(ConditionallyUnpairedTerm term(
+				"dummy", ConditionEnum::APO, {}));
 }
 
 

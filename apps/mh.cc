@@ -46,7 +46,7 @@ Options:
     
   -o --output <path>             [default: logs/mh.tsv]
     The path where the trajectory of the design simulation will be saved.  This 
-    trajectory includes score and sequences for every step of the simulation.
+    trajectory includes scores and sequences for every step of the simulation.
     
   -v --version
     Display the version of ``mh`` being used.
@@ -74,11 +74,16 @@ build_rhf_6_sgrna() {
 
 	*sgrna += make_shared<Domain>("spacer", "");
 	*sgrna += make_shared<Domain>("lower_stem/a", "guuuua", GREEN);
-	*sgrna += make_shared<Domain>("upper_stem", "gagcuagaaauagcaagu", GREEN);
+	*sgrna += make_shared<Domain>("bulge/a", "ga", GREEN);
+	*sgrna += make_shared<Domain>("upper_stem/a", "gcua", GREEN);
+	*sgrna += make_shared<Domain>("upper_stem/b", "gaaa", GREEN);
+	*sgrna += make_shared<Domain>("upper_stem/c", "uagc", GREEN);
+	*sgrna += make_shared<Domain>("bulge/b", "aagu", GREEN);
 	*sgrna += make_shared<Domain>("lower_stem/b", "uaaaau", GREEN);
-	*sgrna += make_shared<Domain>("nexus/a", "aagg", RED);
-	*sgrna += make_shared<Domain>("nexus/b", "cuagu", RED, BOLD);
-	*sgrna += make_shared<Domain>("nexus/c", "cc", RED);
+	*sgrna += make_shared<Domain>("nexus/a", "aa", RED);
+	*sgrna += make_shared<Domain>("nexus/b", "gg", RED);
+	*sgrna += make_shared<Domain>("nexus/c", "cuagu", RED, BOLD);
+	*sgrna += make_shared<Domain>("nexus/d", "cc", RED);
 	*sgrna += make_shared<Domain>("ruler", "CuUUUC", MAGENTA, BOLD);
 	*sgrna += make_shared<Domain>("hairpin/a", "GCC", BLUE, BOLD);
 	*sgrna += make_shared<Domain>("aptamer", "gauaccagccgaaaggcccuuggcagc", YELLOW);
@@ -101,12 +106,17 @@ build_mh_sgrna() {
 
 	*sgrna += make_shared<Domain>("spacer", "");
 	*sgrna += make_shared<Domain>("lower_stem/a", "guuuua", GREEN);
-	*sgrna += make_shared<Domain>("upper_stem", "gagcuagaaauagcaagu", GREEN);
+	*sgrna += make_shared<Domain>("bulge/a", "ga", GREEN);
+	*sgrna += make_shared<Domain>("upper_stem/a", "gcua", GREEN);
+	*sgrna += make_shared<Domain>("upper_stem/b", "gaaa", GREEN);
+	*sgrna += make_shared<Domain>("upper_stem/c", "uagc", GREEN);
+	*sgrna += make_shared<Domain>("bulge/b", "aagu", GREEN);
 	*sgrna += make_shared<Domain>("lower_stem/b", "uaaaau", GREEN);
-	*sgrna += make_shared<Domain>("nexus/a", "aagg", RED);
-	*sgrna += make_shared<Domain>("nexus/b", "CUAGU", RED, BOLD);
-	*sgrna += make_shared<Domain>("nexus/c", "cc", RED);
-	*sgrna += make_shared<Domain>("ruler", "GUUAUCA", MAGENTA, BOLD);
+	*sgrna += make_shared<Domain>("nexus/a", "aa", RED);
+	*sgrna += make_shared<Domain>("nexus/b", "gg", RED);
+	*sgrna += make_shared<Domain>("nexus/c", "CUAGU", RED, BOLD);
+	*sgrna += make_shared<Domain>("nexus/d", "cc", RED);
+	*sgrna += make_shared<Domain>("ruler", "GUAUCA", MAGENTA, BOLD);
 	*sgrna += make_shared<Domain>("hairpin/a", "ACU", BLUE, BOLD);
 	*sgrna += make_shared<Domain>("aptamer", "gauaccagccgaaaggcccuuggcagc", YELLOW);
 	*sgrna += make_shared<Domain>("hairpin/b", "AGU", BLUE, BOLD);
@@ -125,53 +135,73 @@ build_mh_scorefxn(ScorefxnEnum style=ScorefxnEnum::SPECIFIC) {
 			// Fold differently with the ligand than without it.
 
 			*scorefxn += ScoreTermPtr(new LigandSensitivityTerm(
-					{"nexus/a", "nexus/b", "nexus/c", "ruler", "hairpin/a", "hairpin/b"},
+					"ligand_sensitivity",
+					{"nexus/b", "nexus/c", "nexus/d", "ruler", "hairpin/a", "hairpin/b"},
 					1.0
 					));
 
 			break;
 
 		case ScorefxnEnum::SPECIFIC:
-			// Desired base pairs *without* ligand.
+			// Desired fold *without* ligand.
 
-			*scorefxn += ScoreTermPtr(new SpecificLigandSensitivityTerm(
+			*scorefxn += ScoreTermPtr(new ConditionallyPairedTerm(
+					"paired/apo/nexus",
 					ConditionEnum::APO,
-					{"nexus/a", "nexus/b", "nexus/c"},
+					{"nexus/a", "nexus/b", "nexus/c", "nexus/d"},
 					{"ruler", "hairpin/a", "aptamer", "hairpin/b"}
 			));
 
-			*scorefxn += ScoreTermPtr(new SpecificLigandSensitivityTerm(
+			*scorefxn += ScoreTermPtr(new ConditionallyPairedTerm(
+					"paired/apo/hairpin/a",
 					ConditionEnum::APO,
 					{"hairpin/a"},
-					{"nexus/a", "nexus/b", "nexus/c", "ruler"}
+					{"nexus/a", "nexus/b", "nexus/c", "nexus/d", "ruler"}
 			));
 
-			*scorefxn += ScoreTermPtr(new SpecificLigandSensitivityTerm(
+			*scorefxn += ScoreTermPtr(new ConditionallyPairedTerm(
+					"paired/apo/hairpin/b",
 					ConditionEnum::APO,
 					{"hairpin/b"},
 					{"aptamer"}
 			));
 
-			// Desired base pairs *with* ligand.
+			// Desired fold *with* ligand.
 
-			*scorefxn += ScoreTermPtr(new SpecificLigandSensitivityTerm(
+			*scorefxn += ScoreTermPtr(new ConditionallyUnpairedTerm(
+					"unpaired/holo/nexus",
+					ConditionEnum::HOLO,
+					{"nexus/a", "nexus/c"}
+			));
+
+			*scorefxn += ScoreTermPtr(new ConditionallyUnpairedTerm(
+					"unpaired/holo/ruler",
+					ConditionEnum::HOLO,
+					{"ruler"}
+			));
+
+			*scorefxn += ScoreTermPtr(new ConditionallyPairedTerm(
+					"paired/holo/hairpin",
 					ConditionEnum::HOLO,
 					{"hairpin/a"},
 					{"hairpin/b"}
 			));
 
-			// Desired base pairs *with and without* ligand.
-			//
-			//*scorefxn += ScoreTermPtr(new RequiredBasePairing(
-			//		{"lower_stem/a"},
-			//		{"lower_stem/b"},
-			//		1.0 / 6.0
-			//));
+			// Desired fold *with and without* ligand.
+
+			*scorefxn += ScoreTermPtr(new AlwaysUnpairedTerm(
+						"unpaired/always/spacer",
+						{"spacer"}
+			));
+
+			*scorefxn += ScoreTermPtr(new AlwaysPairedTerm(
+					"paired/always/lower_stem",
+					{"lower_stem/a"},
+					{"lower_stem/b"}
+			));
 
 			break;
 	}
-
-	//*scorefxn += StableFoldTerm();
 
 	return scorefxn;
 }
@@ -180,11 +210,11 @@ MonteCarloPtr
 build_mh_sampler(ConstructPtr wt) {
 	MonteCarloPtr sampler = make_shared<MonteCarlo>();
 	vector<string> mutable_domains = {
-		"nexus/b", "ruler", "hairpin/a", "hairpin/b"
+		"nexus/c", "ruler", "hairpin/a", "hairpin/b"
 	};
 	
 	*sampler += make_shared<MakePointMutation>(mutable_domains);
-	*sampler += make_shared<ChangeDomainLength>("ruler", 4, 7);
+	//*sampler += make_shared<ChangeDomainLength>("ruler", 4, 7);
 	//*sampler += make_shared<MakeWtReversion>(mutable_domains, wt);
 
 	return sampler;
@@ -198,7 +228,7 @@ int main(int argc, char **argv) {
 	ConstructPtr mh = build_mh_sgrna();
 	ConstructPtr rhf_6 = build_rhf_6_sgrna();
 	ConstructPtr wt = mh->copy();
-	ScoreFunctionPtr scorefxn = build_mh_scorefxn(ScorefxnEnum::GENERAL);
+	ScoreFunctionPtr scorefxn = build_mh_scorefxn(ScorefxnEnum::SPECIFIC);
 	MonteCarloPtr sampler = build_mh_sampler(wt);
 	ThermostatPtr thermostat = build_thermostat(
 			args["--temperature"].asString());
@@ -214,10 +244,6 @@ int main(int argc, char **argv) {
 	sampler->add_reporter(traj_reporter);
 
 	mh = sampler->apply(mh, rng);
-
-	cout << f("wt:     %s (%.4f)") % *wt % scorefxn->evaluate(wt) << endl;
-	cout << f("rhf(6): %s (%.4f)") % *rhf_6 % scorefxn->evaluate(rhf_6) << endl;
-	cout << f("mh:     %s (%.4f)") % *mh % scorefxn->evaluate(mh) << endl;
 
 	return 0;
 }

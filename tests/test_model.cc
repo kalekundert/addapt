@@ -18,7 +18,7 @@ TEST_CASE("Test the Domain constructor", "[model]") {
 	CHECK(theo.style() == StyleEnum::BOLD);
 }
 
-TEST_CASE("Test the Domain::mutate method") {
+TEST_CASE("Test the Domain::mutate method", "[model]") {
 	Domain dummy("dummy");
 
 	SECTION("positive indices count from the front") {
@@ -41,7 +41,7 @@ TEST_CASE("Test the Domain::mutate method") {
 	}
 }
 
-TEST_CASE("Test the Domain::insert method") {
+TEST_CASE("Test the Domain::insert method", "[model]") {
 	Domain dummy("dummy");
 
 	SECTION("indices refer to positions between nucleotides") {
@@ -79,7 +79,7 @@ TEST_CASE("Test the Domain::insert method") {
 	}
 }
 
-TEST_CASE("Test the Domain::remove(int) method") {
+TEST_CASE("Test the Domain::remove(int) method", "[model]") {
 	Domain dummy("dummy");
 
 	SECTION("the index refers to the nucleotides, counting from 0") {
@@ -102,7 +102,7 @@ TEST_CASE("Test the Domain::remove(int) method") {
 	}
 }
 
-TEST_CASE("Test the Domain::remove(int, int) method") {
+TEST_CASE("Test the Domain::remove(int, int) method", "[model]") {
 	Domain dummy("dummy");
 
 	SECTION("two indices: refer to positions between nucleotides") {
@@ -152,7 +152,7 @@ TEST_CASE("Test the Domain::remove(int, int) method") {
 	}
 }
 
-TEST_CASE("Test the Domain::replace method") {
+TEST_CASE("Test the Domain::replace method", "[model]") {
 	Domain dummy("dummy");
 
 	SECTION("indices refer to positions between nucleotides") {
