@@ -138,9 +138,9 @@ public:
 
 	double adjust(MonteCarloStep const &);
 
-	int num_cycles() const;
+	int cycle_len() const;
 
-	void num_cycles(int);
+	void cycle_len(int);
 
 	double max_temperature() const;
 
@@ -152,7 +152,7 @@ public:
 
 private:
 
-	int my_num_cycles;
+	int my_cycle_len;
 	double my_max_temperature;
 	double my_min_temperature;
 

@@ -37,7 +37,7 @@ Options:
     likelihood of accepting a negative move.  If T=0, only positive moves will 
     be accepted.  In the limit that T=inf, every move will be accepted.  You 
     can specify a fixed temperature (e.g. "5"), a multi-cooled simulated 
-    annealing schedule (e.g. "5x 10=>0"), or schedule that tries to achieve 
+    annealing schedule (e.g. "5 10=>0"), or schedule that tries to achieve 
     a certain acceptance rate (e.g. "auto 50%").
     
   -r --random-seed <seed>        [default: 0]
@@ -208,31 +208,36 @@ build_mh_sampler(ConstructConstPtr wt, vector<string> mutable_domains) {
 
 
 int main(int argc, char **argv) {
-	map<string, docopt::value> args = docopt::docopt(
-			USAGE+1, {argv + 1, argv + argc}, true, "0.0");
+	try {
+		map<string, docopt::value> args = docopt::docopt(
+				USAGE+1, {argv + 1, argv + argc}, true, "0.0");
 
-	vector<string> mutable_domains;
-	ConstructPtr mh = build_mh_sgrna(mutable_domains);
-	ConstructPtr wt = mh->copy();
-	ScoreFunctionPtr scorefxn = build_mh_scorefxn(
-			wt, mutable_domains, ScorefxnEnum::SPECIFIC, FavorWtEnum::YES);
-	MonteCarloPtr sampler = build_mh_sampler(wt, mutable_domains);
-	ThermostatPtr thermostat = build_thermostat(
-			args["--temperature"].asString());
-	ReporterPtr progress_bar = make_shared<ProgressReporter>();
-	ReporterPtr traj_reporter = make_shared<TsvTrajectoryReporter>(
-			args["--output"].asString());
-	std::mt19937 rng(stoi(args["--random-seed"].asString()));
+		vector<string> mutable_domains;
+		ConstructPtr mh = build_mh_sgrna(mutable_domains);
+		ConstructPtr wt = mh->copy();
+		ScoreFunctionPtr scorefxn = build_mh_scorefxn(
+				wt, mutable_domains, ScorefxnEnum::SPECIFIC, FavorWtEnum::YES);
+		MonteCarloPtr sampler = build_mh_sampler(wt, mutable_domains);
+		ThermostatPtr thermostat = build_thermostat(
+				args["--temperature"].asString());
+		ReporterPtr progress_bar = make_shared<ProgressReporter>();
+		ReporterPtr traj_reporter = make_shared<TsvTrajectoryReporter>(
+				args["--output"].asString());
+		std::mt19937 rng(stoi(args["--random-seed"].asString()));
 
-	sampler->num_steps(stoi(args["--num-moves"].asString()));
-	sampler->thermostat(thermostat);
-	sampler->scorefxn(scorefxn);
-	sampler->add_reporter(progress_bar);
-	sampler->add_reporter(traj_reporter);
+		sampler->num_steps(stoi(args["--num-moves"].asString()));
+		sampler->thermostat(thermostat);
+		sampler->scorefxn(scorefxn);
+		sampler->add_reporter(progress_bar);
+		sampler->add_reporter(traj_reporter);
 
-	mh = sampler->apply(mh, rng);
+		mh = sampler->apply(mh, rng);
 
-	return 0;
+		return 0;
+	}
+	catch(string error_message) {
+		cerr << "Error: " << error_message << endl;
+	}
 }
 
 

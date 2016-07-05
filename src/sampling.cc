@@ -170,7 +170,7 @@ build_thermostat(string spec) {
 	);
 	std::regex annealing_pattern(
 			"(?:"               // Optional argument.
-			"([0-9]+)x"         // An integer followed by 'x' (the number of cycles).
+			"([0-9]+)"          // An integer (the number of steps per cycle).
 			"\\s+"
 			")?"
 			"([0-9.e+-]+)"      // A floating point number (the high temperature).
@@ -203,10 +203,10 @@ build_thermostat(string spec) {
 	}
 
 	if(std::regex_match(spec, match, annealing_pattern)) {
-		int num_cycles = stoi(match[1].length()? match[1].str() : "1");
+		int cycle_len = stoi(match[1].length()? match[1].str() : "1");
 		double high_temp = stod(match[2]);
 		double low_temp = stod(match[3]);
-		return make_shared<AnnealingThermostat>(num_cycles, high_temp, low_temp);
+		return make_shared<AnnealingThermostat>(cycle_len, high_temp, low_temp);
 	}
 
 	if(std::regex_match(spec, match, auto_scaling_pattern)) {
@@ -241,15 +241,15 @@ FixedThermostat::temperature(double value) {
 
 
 AnnealingThermostat::AnnealingThermostat(
-		int num_cycles, double max_temperature, double min_temperature):
+		int cycle_len, double max_temperature, double min_temperature):
 
-	my_num_cycles(num_cycles),
+	my_cycle_len(cycle_len),
 	my_max_temperature(max_temperature),
 	my_min_temperature(min_temperature) {}
 
 double
 AnnealingThermostat::adjust(MonteCarloStep const &step) {
-	int N = step.num_steps / my_num_cycles;
+	int N = my_cycle_len;
 	int i = step.i;
 	double T_hi = my_max_temperature;
 	double T_lo = my_min_temperature;
@@ -257,13 +257,13 @@ AnnealingThermostat::adjust(MonteCarloStep const &step) {
 }
 
 int
-AnnealingThermostat::num_cycles() const {
-	return my_num_cycles;
+AnnealingThermostat::cycle_len() const {
+	return my_cycle_len;
 }
 
 void
-AnnealingThermostat::num_cycles(int value) {
-	my_num_cycles = value;
+AnnealingThermostat::cycle_len(int value) {
+	my_cycle_len = value;
 }
 
 double
