@@ -200,12 +200,7 @@ LigandSensitivityTerm::LigandSensitivityTerm(
 		double weight):
 
 	ScoreTerm(name, weight),
-	my_selection(selection) {
-
-	if(my_selection.empty()) {
-		throw "cannot score empty selection";
-	}
-}
+	my_selection(selection) {}
 
 double
 LigandSensitivityTerm::evaluate(
@@ -221,6 +216,10 @@ LigandSensitivityTerm::evaluate(
 	double p_apo, p_holo;
 
 	vector<int> indices = domains_to_indices(sgrna, my_selection);
+
+	if(indices.empty()) {
+		return 0;
+	}
 
 	for(auto it_i = indices.begin(); it_i != indices.end(); it_i++) {
 		for(auto it_j = it_i; it_j != indices.end(); it_j++) {
@@ -253,12 +252,7 @@ ConditionallyPairedTerm::ConditionallyPairedTerm(
 	ScoreTerm(name, weight),
 	my_condition(condition),
 	my_selection(selection),
-	my_targets(targets) {
-	
-	if(my_selection.empty()) {
-		throw "cannot score empty selection";
-	}
-}
+	my_targets(targets) {}
 
 double
 ConditionallyPairedTerm::evaluate(
@@ -268,6 +262,10 @@ ConditionallyPairedTerm::evaluate(
 
 	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
 	vector<int> target_indices = domains_to_indices(sgrna, my_targets);
+
+	if(selection_indices.empty()) {
+		return 0;
+	}
 
 	double sensitivity = 0;
 	double p_apo, p_holo;
@@ -313,12 +311,7 @@ ConditionallyUnpairedTerm::ConditionallyUnpairedTerm(
 
 	ScoreTerm(name, weight),
 	my_condition(condition),
-	my_selection(selection) {
-
-	if(my_selection.empty()) {
-		throw "cannot score empty selection";
-	}
-}
+	my_selection(selection) {}
 
 double
 ConditionallyUnpairedTerm::evaluate(
@@ -327,6 +320,10 @@ ConditionallyUnpairedTerm::evaluate(
 		RnaFold const &holo_fold) const {
 
 	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
+
+	if(selection_indices.empty()) {
+		return 0;
+	}
 
 	double sensitivity = 0;
 
@@ -374,12 +371,7 @@ AlwaysPairedTerm::AlwaysPairedTerm(
 
 	ScoreTerm(name, weight),
 	my_selection(selection),
-	my_targets(targets) {
-	
-	if(my_selection.empty()) {
-		throw "cannot score empty selection";
-	}
-}
+	my_targets(targets) {}
 
 double
 AlwaysPairedTerm::evaluate(
@@ -389,6 +381,10 @@ AlwaysPairedTerm::evaluate(
 
 	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
 	vector<int> target_indices = domains_to_indices(sgrna, my_targets);
+
+	if(selection_indices.empty()) {
+		return 0;
+	}
 
 	double sensitivity = 0;
 
@@ -401,19 +397,15 @@ AlwaysPairedTerm::evaluate(
 			p_holo += holo_fold.base_pair_prob(i, j);
 		}
 
-		// I think it's a little easier to understand what this score term does by 
-		// reading pseudo-math pseudo-code:
-		//
-		// Prob{paired correctly, apo}  * log(Enrichment{paired correctly, apo}) +
-		// Prob{paired correctly, holo} * log(Enrichment{paired correctly, holo}),
-		//
-		// where Enrichment is how much more likely the nucleotide is to be 
-		// correctly paired vs incorrectly paired in the given condition.  The 
-		// logarithm is important because it allows us to sum these expressions.
+		// Here, the probability of the undesired fold doesn't depend on the 
+		// condition, it's just one minus the probability of the desired fold.  
+		// This simplifies the basic score term expression even more, because the 
+		// probabilities sum to one and the only remaining term is the enrichment 
+		// ratio.  The enrichment ratios for both conditions are included.
 
 		if(p_apo > 0 and p_apo < 1 and p_holo > 0 and p_holo < 1) {
-			sensitivity += p_apo * log(p_apo / (1 - p_apo));
-			sensitivity += p_holo * log(p_holo / (1 - p_holo));
+			sensitivity += log(p_apo / (1 - p_apo));
+			sensitivity += log(p_holo / (1 - p_holo));
 		}
 	}
 
@@ -456,15 +448,15 @@ AlwaysUnpairedTerm::evaluate(
 			p_holo -= holo_fold.base_pair_prob(i, j);
 		}
 
-		// I think it's a little easier to understand what this score term does by 
-		// reading pseudo-math pseudo-code:
-		//
-		// + Prob{unpaired, apo}  * log(Enrichment{unpaired over paired, apo})
-		// + Prob{unpaired, holo} * log(Enrichment{unpaired over paired, holo})
+		// Here, the probability of the undesired fold doesn't depend on the 
+		// condition, it's just one minus the probability of the desired fold.  
+		// This simplifies the basic score term expression even more, because the 
+		// probabilities sum to one and the only remaining term is the enrichment 
+		// ratio.  The enrichment ratios for both conditions are included.
 
 		if(p_apo > 0 and p_apo < 1 and p_holo > 0 and p_holo < 1) {
-			sensitivity += p_apo * log(p_apo / (1 - p_apo));
-			sensitivity += p_holo * log(p_holo / (1 - p_holo));
+			sensitivity += log(p_apo / (1 - p_apo));
+			sensitivity += log(p_holo / (1 - p_holo));
 		}
 	}
 

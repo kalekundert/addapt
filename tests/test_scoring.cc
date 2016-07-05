@@ -296,15 +296,16 @@ TEST_CASE("Test the 'ligand sensitivity' score term", "[scoring]") {
 	};
 
 	vector<Test> tests = {
-		// The score is 0 if there aren't any base pairs.
-		{{"a"}, 0},
-		{{"b"}, 0},
-		{{"c"}, 0},
-
 		// The score increases with the number of ligand-sensitive base pairs.
 		{{"a","b"}, (0.3-0.1)*log(3)/3},
 		{{"a","c"}, (0.4-0.2)*log(2)/3},
-		{{"a","b","c"}, (0.3-0.1)*log(3)/4 + (0.4-0.2)*log(2)/4}
+		{{"a","b","c"}, (0.3-0.1)*log(3)/4 + (0.4-0.2)*log(2)/4},
+
+		// The score is 0 if there aren't any base pairs.
+		{{},    0},
+		{{"a"}, 0},
+		{{"b"}, 0},
+		{{"c"}, 0}
 	};
 
 	// Each scenario is scored correctly.
@@ -316,29 +317,25 @@ TEST_CASE("Test the 'ligand sensitivity' score term", "[scoring]") {
 		CAPTURE(test.selection);
 		CHECK(score == Approx(test.expected_score));
 	}
-
-	// You can't score empty selections.
-	CHECK_THROWS(LigandSensitivityTerm term("dummy", {}));
-
 }
 
 TEST_CASE("Test the 'conditionally paired' score term", "[scoring]") {
 	// Make a construct with individually indexable nucleotides.
 	ConstructPtr dummy_construct = make_shared<Construct>();
 	*dummy_construct += make_shared<Domain>("a", "U");
+	*dummy_construct += make_shared<Domain>("A", "U");
 	*dummy_construct += make_shared<Domain>("b", "U");
 	*dummy_construct += make_shared<Domain>("B", "U");
-	*dummy_construct += make_shared<Domain>("A", "U");
 
 	// Define fake base-pairing probabilities for this construct.
 	DummyRnaFold dummy_apo_fold;
 	DummyRnaFold dummy_holo_fold;
 
-	dummy_apo_fold[{0,3}] = 0.20;
-	dummy_holo_fold[{0,3}] = 0.40;
+	dummy_apo_fold[{0,1}] = 0.20;
+	dummy_holo_fold[{0,1}] = 0.40;
 
-	dummy_apo_fold[{1,2}] = 0.30;
-	dummy_holo_fold[{1,2}] = 0.10;
+	dummy_apo_fold[{2,3}] = 0.30;
+	dummy_holo_fold[{2,3}] = 0.10;
 
 	// Define expected scores for various combinations of nucleotides.
 	struct Test {
@@ -360,13 +357,13 @@ TEST_CASE("Test the 'conditionally paired' score term", "[scoring]") {
 		{{"a","b"}, {"A","B"},  0.6*log(2)/2 -0.4*log(3)/2},
 
 		// The score is 0 if there aren't any base pairs.
+		{{},    {},    0},
 		{{"a"}, {},    0},
 		{{"a"}, {"a"}, 0},
 		{{"a"}, {"B"}, 0},
 		{{"b"}, {},    0},
 		{{"b"}, {"b"}, 0},
 		{{"b"}, {"A"}, 0},
-
 	};
 
 	// Each scenario is scored correctly in both the apo and holo conditions.
@@ -387,31 +384,27 @@ TEST_CASE("Test the 'conditionally paired' score term", "[scoring]") {
 		CHECK(apo_score == Approx(-test.expected_score));
 		CHECK(holo_score == Approx(test.expected_score));
 	}
-
-	// You can't score empty selections.
-	CHECK_THROWS(ConditionallyPairedTerm term(
-				"dummy", ConditionEnum::APO, {}, {"a"}));
 }
 
 TEST_CASE("Test the 'conditionally unpaired' score term", "[scoring]") {
 	// Make a construct with individually indexable nucleotides.
 	ConstructPtr dummy_construct = make_shared<Construct>();
 	*dummy_construct += make_shared<Domain>("a", "U");
+	*dummy_construct += make_shared<Domain>("A", "U");
 	*dummy_construct += make_shared<Domain>("b", "U");
 	*dummy_construct += make_shared<Domain>("B", "U");
-	*dummy_construct += make_shared<Domain>("A", "U");
 
 	// Define fake base-pairing probabilities for this construct.
 	DummyRnaFold dummy_apo_fold;
 	DummyRnaFold dummy_holo_fold;
 
-	dummy_apo_fold[{0,3}]  = 0.8; // p_unpaired(0, apo)  = 0.2
-	dummy_holo_fold[{0,3}] = 0.6; // p_unpaired(0, holo) = 0.4
+	dummy_apo_fold[{0,1}]  = 0.8; // p_unpaired(0, apo)  = 0.2
+	dummy_holo_fold[{0,1}] = 0.6; // p_unpaired(0, holo) = 0.4
 
-	dummy_apo_fold[{1,2}]  = 0.6; // p_unpaired(1, apo)  = 0.3
-	dummy_apo_fold[{1,3}]  = 0.1;
-	dummy_holo_fold[{1,2}] = 0.6; // p_unpaired(1, holo) = 0.1
-	dummy_holo_fold[{1,3}] = 0.3;
+	dummy_apo_fold[{2,3}]  = 0.6; // p_unpaired(2, apo)  = 0.3
+	dummy_apo_fold[{2,1}]  = 0.1;
+	dummy_holo_fold[{2,3}] = 0.6; // p_unpaired(2, holo) = 0.1
+	dummy_holo_fold[{2,1}] = 0.3;
 
 	// Define expected scores for various combinations of nucleotides.
 	struct Test {
@@ -420,6 +413,7 @@ TEST_CASE("Test the 'conditionally unpaired' score term", "[scoring]") {
 	};
 
 	vector<Test> tests = {
+		{{},         0},
 		{{"a"},      0.6*log(2)},
 		{{"b"},     -0.4*log(3)},
 		{{"a","b"},  0.6*log(2)/2 -0.4*log(3)/2}
@@ -442,10 +436,120 @@ TEST_CASE("Test the 'conditionally unpaired' score term", "[scoring]") {
 		CHECK(apo_score == Approx(-test.expected_score));
 		CHECK(holo_score == Approx(test.expected_score));
 	}
+}
 
-	// You can't score empty selections.
-	CHECK_THROWS(ConditionallyUnpairedTerm term(
-				"dummy", ConditionEnum::APO, {}));
+TEST_CASE("Test the 'always paired' score term", "[scoring]") {
+	// Make a construct with individually indexable nucleotides.
+	ConstructPtr dummy_construct = make_shared<Construct>();
+	*dummy_construct += make_shared<Domain>("a", "U");
+	*dummy_construct += make_shared<Domain>("A", "U");
+	*dummy_construct += make_shared<Domain>("b", "U");
+	*dummy_construct += make_shared<Domain>("B", "U");
+	*dummy_construct += make_shared<Domain>("c", "U");
+	*dummy_construct += make_shared<Domain>("C", "U");
+
+	// Define fake base-pairing probabilities for this construct.
+	DummyRnaFold dummy_apo_fold;
+	DummyRnaFold dummy_holo_fold;
+
+	dummy_apo_fold[{0,1}] = 0.50;
+	dummy_holo_fold[{0,1}] = 0.25;
+
+	dummy_apo_fold[{2,3}] = 0.80;
+	dummy_holo_fold[{2,3}] = 0.90;
+
+	dummy_apo_fold[{3,4}] = 1.00;
+	dummy_holo_fold[{3,4}] = 1.00;
+
+	// Define expected scores for various combinations of nucleotides.
+	struct Test {
+		vector<string> selection;
+		vector<string> targets;
+		double expected_score;
+	};
+
+	vector<Test> tests = {
+		// The score indicates how well the base pair forms in both conditions.
+		{{"a"}, {"A"}, -log(1*3)/2},
+		{{"b"}, {"B"}, +log(4*9)/2},
+
+		// The score is normalized by the number of nucleotides in the selection.
+		{{"a"},     {"A","B"}, -log(1*3)/2},
+		{{"b"},     {"A","B"}, +log(4*9)/2},
+		{{"a","b"}, {"A"},     -log(1*3)/4},
+		{{"a","b"}, {"B"},     +log(4*9)/4},
+		{{"a","b"}, {"A","B"}, -log(1*3)/4 +log(4*9)/4},
+
+		// The score is 0 if there aren't any base pairs.
+		{{},    {},    0},
+		{{"a"}, {},    0},
+		{{"a"}, {"a"}, 0},
+		{{"a"}, {"B"}, 0},
+		{{"b"}, {},    0},
+		{{"b"}, {"b"}, 0},
+		{{"b"}, {"A"}, 0},
+
+		// Counter-intuitively, the score is also zero if no off-targets are 
+		// possible, because otherwise it would be infinite in this case.
+		{{"c"}, {"C"}, 0}
+	};
+
+	// Each scenario is scored correctly in both the apo and holo conditions.
+	for(Test test: tests) {
+		AlwaysPairedTerm term(
+				"dummy", test.selection, test.targets);
+
+		double score = term.evaluate(
+				dummy_construct, dummy_apo_fold, dummy_holo_fold);
+
+		CAPTURE(test.selection);
+		CAPTURE(test.targets);
+
+		CHECK(score == Approx(test.expected_score));
+	}
+}
+
+TEST_CASE("Test the 'always unpaired' score term", "[scoring]") {
+	// Make a construct with individually indexable nucleotides.
+	ConstructPtr dummy_construct = make_shared<Construct>();
+	*dummy_construct += make_shared<Domain>("a", "U");
+	*dummy_construct += make_shared<Domain>("A", "U");
+	*dummy_construct += make_shared<Domain>("b", "U");
+	*dummy_construct += make_shared<Domain>("B", "U");
+
+	// Define fake base-pairing probabilities for this construct.
+	DummyRnaFold dummy_apo_fold;
+	DummyRnaFold dummy_holo_fold;
+
+	dummy_apo_fold[{0,1}]  = 0.50; // p_unpaired(0, apo)  = 0.50
+	dummy_holo_fold[{0,1}] = 0.75; // p_unpaired(0, holo) = 0.25
+
+	dummy_apo_fold[{2,3}]  = 0.10; // p_unpaired(2, apo)  = 0.80
+	dummy_apo_fold[{2,1}]  = 0.10;
+	dummy_holo_fold[{2,3}] = 0.05; // p_unpaired(2, holo) = 0.90
+	dummy_holo_fold[{2,1}] = 0.05;
+
+	// Define expected scores for various combinations of nucleotides.
+	struct Test {
+		vector<string> selection;
+		double expected_score;
+	};
+
+	vector<Test> tests = {
+		{{},         0},
+		{{"a"},     -log(1*3)/2},
+		{{"b"},     +log(4*9)/2},
+		{{"a","b"}, -log(1*3)/4 +log(4*9)/4}
+	};
+
+	// Each scenario is scored correctly in both the apo and holo conditions.
+	for(Test test: tests) {
+		AlwaysUnpairedTerm apo_term("dummy", test.selection);
+		double score = apo_term.evaluate(
+				dummy_construct, dummy_apo_fold, dummy_holo_fold);
+		CAPTURE(test.selection);
+		CHECK(score == Approx(test.expected_score));
+	}
 }
 
 
