@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+
+"""\
+Usage:
+    pick_seqs [<trajectories>...] [options]
+
+Options:
+    -w --window <steps>     [default: 500]
+        The minimum number of steps that must separate two picks.  This should 
+        probably be about the auto-correlation time, to ensure that the picked 
+        sequences are independent.
+
+    -s --explain-scores
+        Explain why each picked sequence scored as well as it did by printing 
+        out the individual score terms and 2° structure predictions for each.
+"""
+
+import docopt, utils
+from tabulate import tabulate
+from textwrap import indent
+from pprint import pprint
+
+args = docopt.docopt(__doc__)
+best_seqs = utils.pick_best_seqs(args['<trajectories>'], int(args['--window']))
+
+for pick in best_seqs:
+    print('Step:', pick.i)
+    print('Seq:', pick.seq)
+    print('Score:', pick.score)
+
+    if args['--explain-scores']:
+        print('Score Terms:')
+        table = []
+        for col in pick.traj.columns:
+            if col.startswith('term_value'):
+                row = col[11:-1], pick.traj[col][pick.i]
+                table.append(row)
+        table.sort(key=lambda x: x[1], reverse=True)
+        print(indent(tabulate(table, tablefmt='plain', floatfmt='.4f'), '  '))
+        print("Apo Fold:")
+        print(indent(utils.run_rnafold(pick.seq, theo=False), '  '))
+        print("Holo Fold:")
+        print(indent(utils.run_rnafold(pick.seq, theo=True), '  '))
+
+    print()
+        

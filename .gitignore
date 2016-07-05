@@ -2,7 +2,11 @@
 build/
 bin/
 tests/run_tests
+logs/
 a.out
 *.gcno
 *.tsv
+*.pdf
+*.eps
+*.svg
 __pycache__

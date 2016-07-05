@@ -33,7 +33,7 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 	auto randmove = std::bind(std::uniform_int_distribution<>(0, my_moves.size()-1), rng);
 
 	// Get an initial score.
-	step.current_score = my_scorefxn->evaluate(sgrna);
+	step.current_score = my_scorefxn->evaluate(step.current_sgrna, step.score_table);
 	step.proposed_score = step.current_score;
 
 	// Initialize the counters that will keep track of how often moves are 
@@ -68,7 +68,7 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 
 		// Score the proposed move, then either accept or reject it.
 		else {
-			step.proposed_score = my_scorefxn->evaluate(step.proposed_sgrna);
+			step.proposed_score = my_scorefxn->evaluate(step.proposed_sgrna, step.score_table);
 			step.score_diff = step.proposed_score - step.current_score;
 			step.metropolis_criterion = std::exp(step.score_diff / step.temperature);
 			step.random_threshold = random();
@@ -354,6 +354,12 @@ TsvTrajectoryReporter::start(MonteCarloStep const & step) {
 	my_tsv << "num_steps\t";
 	my_tsv << "current_score\t";
 	my_tsv << "proposed_score\t";
+
+	for(auto row: step.score_table) {
+		my_tsv << f("term_weight[%s]") % row.name << "\t";
+		my_tsv << f("term_value[%s]") % row.name << "\t";
+	}
+
 	my_tsv << "score_diff\t";
 	my_tsv << "temperature\t";
 	my_tsv << "metropolis_criterion\t";
@@ -377,6 +383,12 @@ TsvTrajectoryReporter::update(MonteCarloStep const &step) {
 	my_tsv << step.num_steps << "\t";
 	my_tsv << step.current_score << "\t";
 	my_tsv << step.proposed_score << "\t";
+
+	for(auto row: step.score_table) {
+		my_tsv << row.weight << "\t";
+		my_tsv << row.term << "\t";
+	}
+
 	my_tsv << step.score_diff << "\t";
 	my_tsv << step.temperature << "\t";
 	my_tsv << step.metropolis_criterion << "\t";

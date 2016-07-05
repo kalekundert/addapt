@@ -2,59 +2,54 @@
 
 """\
 Usage:
-    plot_traj [<trajectories>...]
+    plot_traj [<trajectory>] [options]
 
+Options:
+    -w --window <steps>
+        If this option is provided, the independent sequences with the best 
+        scores will be picked as in ``pick_seqs`` and the positions of those 
+        sequences will be highlighted in the trajectory.  The window size is 
+        the minimum number of steps that must separate two picks and should be 
+        close to the auto-correlation time.
 """
 
-import docopt
-import tango
+import docopt, tango, utils
 import pandas as pd
 from pylab import *
 from pprint import pprint
 
+args = docopt.docopt(__doc__)
+traj = utils.load_trajectory(args['<trajectory>'])
+best_scores = []
+
+# Highlight the best sequences, if a window was given.
+if args['--window']:
+    best_scores = utils.pick_best_scores(
+            traj['current_score'], int(args['--window']))
+
+def plot_best_scores():
+    for i in best_scores:
+        axvline(traj['step'][i], color=tango.red[1], linestyle=':')
+
+
+# Go into the background.
 from os import fork
 if fork(): raise SystemExit
 
-args = docopt.docopt(__doc__)
-trajectories = args['<trajectories>'] or ['logs/mh.tsv']
+# Plot the score over time.
+subplot(2, 1, 1)
+plot_best_scores()
+plot(traj['step'], traj['current_score'], color=tango.blue[2])
+ylabel('Score')
 
-def find_peaks(scores, window=200):
-    scores = array(scores)
-    w = window // 2
-    BLOCKED = -1
-    peaks = []
+# Plot the temperature over time.
+subplot(2, 1, 2, sharex=gca())
+plot_best_scores()
+plot(traj['step'], traj['temperature'], color=tango.blue[2])
+xlabel('Step')
+ylabel('Temperature')
 
-    while max(scores) > 0:
-        i = argmax(scores)
-        region = slice(max(i-w,0), min(i+w,len(scores)))
-
-        if not any(scores[region] == BLOCKED):
-            peaks.append(i)
-
-        scores[region] = BLOCKED
-
-    return peaks
-
-
-
-for i, tsv_path in enumerate(trajectories):
-    traj = pd.read_table(tsv_path)
-    color = tango.color_from_cycle(i)
-
-    subplot(2, 1, 1)
-    plot(traj['step'], traj['current_score'], label="Current Score", color=color)
-    #plot(traj['step'], traj['proposed_score'], label="Proposed Score", color=color, linestyle=':')
-    ylabel('Score')
-
-    peaks = find_peaks(traj['current_score']);
-    for i in peaks:
-        axvline(traj['step'][i], color=tango.red[1], zorder=0)
-
-    subplot(2, 1, 2, sharex=gca())
-    plot(traj['step'], traj['temperature'], color=color)
-    xlabel('Step')
-    ylabel('Temperature')
-
+# Display the plot.
 gcf().canvas.set_window_title(' '.join(sys.argv))
 tight_layout()
 show()

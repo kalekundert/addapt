@@ -96,6 +96,7 @@ struct MonteCarloStep {
 	int i, num_steps;
 	ConstructPtr current_sgrna, proposed_sgrna;
 	MovePtr move;
+	EvaluatedScoreFunction score_table;
 	double current_score, proposed_score, score_diff;
 	double temperature, metropolis_criterion, random_threshold;
 	OutcomeEnum outcome;
