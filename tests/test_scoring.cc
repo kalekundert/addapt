@@ -272,6 +272,72 @@ TEST_CASE("Test the score function class", "[scoring]") {
 	}
 }
 
+TEST_CASE("Test the 'favor wildtype' score term", "[scoring]") {
+	// Make a construct with individually indexable nucleotides.
+	ConstructPtr wt_construct = make_shared<Construct>();
+	*wt_construct += make_shared<Domain>("a", "AAAA");
+	*wt_construct += make_shared<Domain>("b", "UUUU");
+
+	ConstructPtr dummy_construct = make_shared<Construct>();
+	*dummy_construct += make_shared<Domain>("a", "AAAA");
+	*dummy_construct += make_shared<Domain>("b", "UUUU");
+
+	// Make a place-holder fold object.
+	DummyRnaFold dummy_fold;
+
+	// Define expected scores for various sequences.
+	struct Test {
+		vector<string> selection;
+		vector<string> dummy_seqs;
+		double expected_score;
+	};
+
+	vector<Test> tests = {
+		{{}, {"AAAA","UUUU"}, 0.0},
+
+		{{"a"}, {"UUUU","UUUU"}, 0.0},
+		{{"a"}, {"AAAA","UUUU"}, 1.0},
+		{{"a"}, {"AAAA","AAAA"}, 1.0},
+
+		{{"b"}, {"UUUU","UUUU"}, 1.0},
+		{{"b"}, {"AAAA","UUUU"}, 1.0},
+		{{"b"}, {"AAAA","AAAA"}, 0.0},
+
+		{{"a","b"}, {"UUUU","UUUU"}, 0.5},
+		{{"a","b"}, {"AAAA","UUUU"}, 1.0},
+		{{"a","b"}, {"AAAA","AAAA"}, 0.5},
+
+		{{"a"}, {"UAAA","AUUU"}, 0.75},
+		{{"a"}, {"UUAA","AAUU"}, 0.50},
+		{{"a"}, {"UUUA","AAAU"}, 0.25},
+
+		{{"b"}, {"UAAA","AUUU"}, 0.75},
+		{{"b"}, {"UUAA","AAUU"}, 0.50},
+		{{"b"}, {"UUUA","AAAU"}, 0.25},
+
+		{{"a","b"}, {"UAAA","AUUU"}, 0.75},
+		{{"a","b"}, {"UUAA","AAUU"}, 0.50},
+		{{"a","b"}, {"UUUA","AAAU"}, 0.25},
+
+		{{"a","b"}, {"UAAA","AAAU"}, 0.50},
+		{{"a","b"}, {"UUAA","AAUU"}, 0.50},
+		{{"a","b"}, {"UUUA","AUUU"}, 0.50},
+	};
+
+	// Each scenario is scored correctly.
+	for(Test test: tests) {
+		FavorWildtypeTerm term(wt_construct, test.selection);
+		dummy_construct->domain("a")->seq(test.dummy_seqs[0]);
+		dummy_construct->domain("b")->seq(test.dummy_seqs[1]);
+
+		double score = term.evaluate(dummy_construct, dummy_fold, dummy_fold);
+
+		CAPTURE(test.selection);
+		CAPTURE(test.dummy_seqs);
+		CHECK(score == Approx(test.expected_score));
+	}
+}
+
 TEST_CASE("Test the 'ligand sensitivity' score term", "[scoring]") {
 	// Make a construct with individually indexable nucleotides.
 	ConstructPtr dummy_construct = make_shared<Construct>();

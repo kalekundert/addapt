@@ -33,8 +33,10 @@ for pick in best_seqs:
         table = []
         for col in pick.traj.columns:
             if col.startswith('term_value'):
-                row = col[11:-1], pick.traj[col][pick.i]
-                table.append(row)
+                key = col[11:-1]
+                weight = pick.traj['term_weight[%s]' % key][pick.i]
+                value = pick.traj[col][pick.i]
+                table.append((key, weight * value))
         table.sort(key=lambda x: x[1], reverse=True)
         print(indent(tabulate(table, tablefmt='plain', floatfmt='.4f'), '  '))
         print("Apo Fold:")

@@ -133,6 +133,25 @@ private:
 
 };
 
+class FavorWildtypeTerm : public ScoreTerm {
+
+public:
+
+	FavorWildtypeTerm(
+			ConstructConstPtr, vector<string>, double=1.0);
+
+	/// @brief The fraction of the nucleotides in the selected domains that have 
+	/// been mutated.
+	double evaluate(
+			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+
+private:
+
+	ConstructConstPtr my_wt;
+	vector<string> my_selection;
+
+};
+
 class LigandSensitivityTerm : public ScoreTerm {
 
 public:

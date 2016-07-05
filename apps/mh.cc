@@ -60,9 +60,14 @@ enum class ScorefxnEnum {
 	SPECIFIC,
 };
 
+enum class FavorWtEnum {
+	NO,
+	YES,
+};
+
 
 ConstructPtr
-build_mh_sgrna() {
+build_mh_sgrna(vector<string> &mutable_domains) {
 	ColorEnum GREEN = ColorEnum::GREEN;
 	ColorEnum RED = ColorEnum::RED;
 	ColorEnum MAGENTA = ColorEnum::MAGENTA;
@@ -90,12 +95,26 @@ build_mh_sgrna() {
 	*sgrna += make_shared<Domain>("hairpin/b", "AGU", BLUE, BOLD);
 	*sgrna += make_shared<Domain>("tail", "ggcaccgagucggugcuuuuuu", BLUE);
 
+	mutable_domains = {
+		"nexus/c", "ruler", "hairpin/a", "hairpin/b"
+	};
+
 	return sgrna;
 }
 
 ScoreFunctionPtr
-build_mh_scorefxn(ScorefxnEnum style=ScorefxnEnum::SPECIFIC) {
+build_mh_scorefxn(
+		ConstructConstPtr wt,
+		vector<string> mutable_domains,
+		ScorefxnEnum style=ScorefxnEnum::SPECIFIC,
+		FavorWtEnum favor_wt=FavorWtEnum::YES) {
+
 	ScoreFunctionPtr scorefxn = make_shared<ScoreFunction>();
+
+	if(favor_wt == FavorWtEnum::YES) {
+		*scorefxn += ScoreTermPtr(new FavorWildtypeTerm(
+					wt, mutable_domains, 5.0));
+	}
 
 	switch(style) {
 
@@ -104,8 +123,7 @@ build_mh_scorefxn(ScorefxnEnum style=ScorefxnEnum::SPECIFIC) {
 
 			*scorefxn += ScoreTermPtr(new LigandSensitivityTerm(
 					"ligand_sensitivity",
-					{"nexus/b", "nexus/c", "nexus/d", "ruler", "hairpin/a", "hairpin/b"},
-					1.0
+					{"nexus/b", "nexus/c", "nexus/d", "ruler", "hairpin/a", "hairpin/b"}
 					));
 
 			break;
@@ -139,20 +157,23 @@ build_mh_scorefxn(ScorefxnEnum style=ScorefxnEnum::SPECIFIC) {
 			*scorefxn += ScoreTermPtr(new ConditionallyUnpairedTerm(
 					"unpaired/holo/nexus",
 					ConditionEnum::HOLO,
-					{"nexus/a", "nexus/c"}
+					{"nexus/a", "nexus/c"},
+					2.0
 			));
 
 			*scorefxn += ScoreTermPtr(new ConditionallyUnpairedTerm(
 					"unpaired/holo/ruler",
 					ConditionEnum::HOLO,
-					{"ruler"}
+					{"ruler"},
+					2.0
 			));
 
 			*scorefxn += ScoreTermPtr(new ConditionallyPairedTerm(
 					"paired/holo/hairpin",
 					ConditionEnum::HOLO,
 					{"hairpin/a"},
-					{"hairpin/b"}
+					{"hairpin/b"},
+					2.0
 			));
 
 			// Desired fold *with and without* ligand.
@@ -175,11 +196,8 @@ build_mh_scorefxn(ScorefxnEnum style=ScorefxnEnum::SPECIFIC) {
 }
 
 MonteCarloPtr
-build_mh_sampler(ConstructPtr wt) {
+build_mh_sampler(ConstructConstPtr wt, vector<string> mutable_domains) {
 	MonteCarloPtr sampler = make_shared<MonteCarlo>();
-	vector<string> mutable_domains = {
-		"nexus/c", "ruler", "hairpin/a", "hairpin/b"
-	};
 	
 	*sampler += make_shared<MakePointMutation>(mutable_domains);
 	//*sampler += make_shared<ChangeDomainLength>("ruler", 4, 7);
@@ -193,10 +211,12 @@ int main(int argc, char **argv) {
 	map<string, docopt::value> args = docopt::docopt(
 			USAGE+1, {argv + 1, argv + argc}, true, "0.0");
 
-	ConstructPtr mh = build_mh_sgrna();
+	vector<string> mutable_domains;
+	ConstructPtr mh = build_mh_sgrna(mutable_domains);
 	ConstructPtr wt = mh->copy();
-	ScoreFunctionPtr scorefxn = build_mh_scorefxn(ScorefxnEnum::SPECIFIC);
-	MonteCarloPtr sampler = build_mh_sampler(wt);
+	ScoreFunctionPtr scorefxn = build_mh_scorefxn(
+			wt, mutable_domains, ScorefxnEnum::SPECIFIC, FavorWtEnum::YES);
+	MonteCarloPtr sampler = build_mh_sampler(wt, mutable_domains);
 	ThermostatPtr thermostat = build_thermostat(
 			args["--temperature"].asString());
 	ReporterPtr progress_bar = make_shared<ProgressReporter>();

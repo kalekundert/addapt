@@ -162,6 +162,39 @@ domains_to_indices(
 }
 
 
+FavorWildtypeTerm::FavorWildtypeTerm(
+		ConstructConstPtr wt,
+		vector<string> selection,
+		double weight):
+
+	ScoreTerm("favor_wt", weight),
+	my_wt(wt),
+	my_selection(selection) {}
+
+double
+FavorWildtypeTerm::evaluate(
+		ConstructConstPtr sgrna,
+		RnaFold const &apo_fold,
+		RnaFold const &holo_fold) const {
+
+	int wt_nucs = 0;
+	int num_positions = 0;
+
+	if(my_selection.empty()) {
+		return 0;
+	}
+
+	for(string k: my_selection) {
+		for(int i = 0; i < my_wt->domain(k)->len(); i++) {
+			wt_nucs += (sgrna->domain(k)->seq()[i] == my_wt->domain(k)->seq()[i]);
+			num_positions += 1;
+		}
+	}
+
+	return static_cast<double>(wt_nucs) / num_positions;
+}
+
+
 // All of these score terms have the same general form:
 //
 // Sum[
