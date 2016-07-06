@@ -349,6 +349,9 @@ TsvTrajectoryReporter::TsvTrajectoryReporter(string path, int interval):
 void
 TsvTrajectoryReporter::start(MonteCarloStep const & step) {
 	my_tsv.open(my_path);
+	if(not my_tsv.is_open()) {
+		throw (f("couldn't open '%s' for writing") % my_path).str();
+	}
 
 	my_tsv << "step\t";
 	my_tsv << "num_steps\t";
