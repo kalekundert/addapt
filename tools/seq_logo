@@ -16,27 +16,9 @@ Options:
         *.jpeg *.svg
 """
 
-import sys, docopt, tango
+import sys, docopt, tango, utils
 import numpy as np, pandas as pd
 from pprint import pprint
-
-def pick_peaks(scores, window_size):
-    peaks = []
-    scores = np.array(scores)
-    BLOCKED = -1
-
-    while scores.max() != BLOCKED:
-        i = scores.argmax()
-        window = slice(
-                max(i - window_size//2, 0),
-                min(i + window_size//2, len(scores)))
-
-        if not any(scores[window] == BLOCKED):
-            peaks.append(i)
-
-        scores[window] = BLOCKED
-
-    return peaks
 
 def extract_pick(traj, i):
     pass
@@ -59,11 +41,8 @@ def make_seqlogo(wt, seqs, path):
     seqs = weblogo.SeqList(seqs, alphabet=weblogo.std_alphabets['rna'])
     data = weblogo.LogoData.from_seqs(seqs)
     options = weblogo.LogoOptions()
-    options.logo_title = '{} N={}'.format(
-            ' '.join(sys.argv[1:]),
-            len(seqs),
-    )
-    options.show_fineprint = False
+    options.fineprint = 'N={}'.format(len(seqs))
+    options.unit_name = 'probability'
     options.color_scheme = ColorScheme([
         RefSeqColor(wt, '#dfe0e0'),
         SymbolColor("GC", '#178ccb'),
@@ -88,7 +67,7 @@ sequences = []
 
 for tsv_path in trajectories:
     traj = pd.read_table(tsv_path)
-    peaks = pick_peaks(traj['current_score'], window_size)
+    peaks = utils.pick_best_scores(traj['current_score'], window_size)
     sequences += [assemble_seq(traj, i) for i in peaks]
 
 wildtype = assemble_seq(traj, 0)

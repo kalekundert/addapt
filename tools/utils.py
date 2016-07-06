@@ -23,15 +23,14 @@ def pick_best_scores(scores, window_size):
     scores = np.array(scores)
     BLOCKED = -1
 
+
     while scores.max() != BLOCKED:
         i = scores.argmax()
+        peaks.append(i)
+
         window = slice(
-                max(i - window_size//2, 0),
-                min(i + window_size//2, len(scores)))
-
-        if not any(scores[window] == BLOCKED):
-            peaks.append(i)
-
+                max(i - window_size, 0),
+                min(i + window_size, len(scores)))
         scores[window] = BLOCKED
 
     return sorted(peaks)
