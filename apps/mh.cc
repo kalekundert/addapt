@@ -219,7 +219,7 @@ int main(int argc, char **argv) {
 		ConstructPtr mh = build_mh_sgrna(mutable_domains);
 		ConstructPtr wt = mh->copy();
 		ScoreFunctionPtr scorefxn = build_mh_scorefxn(
-				wt, mutable_domains, ScorefxnEnum::SPECIFIC, FavorWtEnum::YES);
+				wt, mutable_domains, ScorefxnEnum::SPECIFIC, FavorWtEnum::NO);
 		MonteCarloPtr sampler = build_mh_sampler(wt, mutable_domains);
 		ThermostatPtr thermostat = build_thermostat(
 				args["--temperature"].asString());
