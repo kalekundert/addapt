@@ -128,7 +128,14 @@ build_mh_scorefxn(
 		ScorefxnEnum style=ScorefxnEnum::SPECIFIC,
 		FavorWtEnum favor_wt=FavorWtEnum::NO) {
 
-	ScoreFunctionPtr scorefxn = make_shared<VariedSpacerScoreFunction>(spacers);
+	ScoreFunctionPtr scorefxn;
+
+	if(not spacers.empty()) {
+		scorefxn = make_shared<VariedSpacerScoreFunction>(spacers);
+	}
+	else {
+		scorefxn = make_shared<ScoreFunction>();
+	}
 
 	if(favor_wt == FavorWtEnum::YES) {
 		*scorefxn += ScoreTermPtr(new FavorWildtypeTerm(
@@ -244,7 +251,7 @@ int main(int argc, char **argv) {
 				stoi(args["--ruler-len"].asString()), mutable_domains);
 		ConstructPtr wt = mh->copy();
 		ScoreFunctionPtr scorefxn = build_mh_scorefxn(
-				wt, mutable_domains, spacers);
+				wt, mutable_domains, {});
 		MonteCarloPtr sampler = build_mh_sampler(wt, mutable_domains);
 		ThermostatPtr thermostat = build_thermostat(
 				args["--temperature"].asString());
