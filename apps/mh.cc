@@ -124,10 +124,11 @@ ScoreFunctionPtr
 build_mh_scorefxn(
 		ConstructConstPtr wt,
 		vector<string> mutable_domains,
+		vector<string> spacers,
 		ScorefxnEnum style=ScorefxnEnum::SPECIFIC,
 		FavorWtEnum favor_wt=FavorWtEnum::NO) {
 
-	ScoreFunctionPtr scorefxn = make_shared<ScoreFunction>();
+	ScoreFunctionPtr scorefxn = make_shared<VariedSpacerScoreFunction>(spacers);
 
 	if(favor_wt == FavorWtEnum::YES) {
 		*scorefxn += ScoreTermPtr(new FavorWildtypeTerm(
@@ -231,10 +232,19 @@ int main(int argc, char **argv) {
 				USAGE+1, {argv + 1, argv + argc}, true, "0.0");
 
 		vector<string> mutable_domains;
+		vector<string> spacers = {
+			  "",
+        "AACTTTCAGTTTAGCGGTCT", // rfp
+        "CATCTAATTCAACAAGAATT", // gfp
+        "GGGGCCACTAGGGACAGGAT", // aavs
+        "GGGTGGGGGGAGTTTGCTCC"  // vegfa
+		};
+
 		ConstructPtr mh = build_mh_sgrna(
 				stoi(args["--ruler-len"].asString()), mutable_domains);
 		ConstructPtr wt = mh->copy();
-		ScoreFunctionPtr scorefxn = build_mh_scorefxn(wt, mutable_domains);
+		ScoreFunctionPtr scorefxn = build_mh_scorefxn(
+				wt, mutable_domains, spacers);
 		MonteCarloPtr sampler = build_mh_sampler(wt, mutable_domains);
 		ThermostatPtr thermostat = build_thermostat(
 				args["--temperature"].asString());

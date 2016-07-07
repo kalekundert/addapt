@@ -59,13 +59,13 @@ public:
 	/// @brief Free the ViennaRNA data structures.
 	~ViennaRnaFold();
 
-	/// @brief Return a string depicting the predicted structure for this 
-	/// sequence.
-	const char *base_pair_string() const;
-
 	/// @brief Return the probability that these two nucleotides will base pair 
 	/// with each other.
 	double base_pair_prob(int, int) const;
+
+	/// @brief Return a string depicting the predicted structure for this 
+	/// sequence.
+	const char *base_pair_string() const;
 
 private:
 
@@ -85,23 +85,65 @@ public:
 	/// @brief Default constructor.
 	ScoreFunction();
 
+	/// @brief Calculate a score for the given construct.
+	double evaluate(ConstructConstPtr) const;
+
+	/// @brief Calculate a score for the given construct and fill in a table 
+	/// containing the name, weight, and value of each score term.
+	virtual double evaluate(ConstructConstPtr, EvaluatedScoreFunction &) const;
+
 	/// @brief Add a term to this score function.
 	void add_term(ScoreTermPtr);
 
 	/// @brief Add a term to this score function.
 	void operator+=(ScoreTermPtr);
 
-	/// @brief Calculate a score for the given construct.
-	double evaluate(ConstructConstPtr) const;
-
-	/// @brief Calculate a score for the given construct and fill in a table 
-	/// containing the name, weight, and value of each score term.
-	double evaluate(ConstructConstPtr, EvaluatedScoreFunction &) const;
-
 private:
 	ScoreTermList my_terms;
 
 };
+
+/// @brief Calculate a score in the context of several different spacer 
+/// sequences and return the average.
+///
+/// @details The purpose of this score function is to find sequences that are 
+/// somehow robust to changes in the spacer sequence.
+class VariedSpacerScoreFunction : public ScoreFunction {
+
+public:
+
+	/// @brief Default constructor.
+	VariedSpacerScoreFunction();
+
+	/// @brief Constructor that accepts a list of spacer sequences.
+	VariedSpacerScoreFunction(vector<string>);
+
+	/// @brief Calculate a score for the given construct and fill in a table 
+	/// containing the name, weight, and value of each score term.
+	virtual double evaluate(ConstructConstPtr, EvaluatedScoreFunction &) const;
+
+	/// @brief Return the spacer sequences being used by this score function.
+	vector<string> spacers() const;
+
+	/// @brief Set the spacer sequences that will be used by this score function.
+	void spacers(vector<string>);
+
+	/// @brief Add a spacer sequence to those being considered by this score 
+	/// function.
+	void add_spacer(string);
+
+	/// @brief Add a spacer sequence to those being considered by this score 
+	/// function.
+	void operator+=(string);
+
+private:
+
+	/// @brief A list of spacer sequences.  The sequences in this list should 
+	/// each be 20 nucleotides long, but this is not checked.
+	vector<string> my_spacers;
+
+};
+
 
 class ScoreTerm {
 
@@ -109,6 +151,10 @@ public:
 
 	/// @brief Optionally initialize the score term with a name and a weight.
 	ScoreTerm(string="", double=1.0);
+
+	/// @brief Calculate an unweighted value for this score term.
+	virtual double evaluate(
+			ConstructConstPtr, RnaFold const &, RnaFold const &) const = 0;
 
 	/// @brief Return this score term's name.
 	string name() const;
@@ -121,10 +167,6 @@ public:
 
 	/// @brief Set this score term's weight.
 	void weight(double);
-
-	/// @brief Calculate an unweighted value for this score term.
-	virtual double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const = 0;
 
 private:
 

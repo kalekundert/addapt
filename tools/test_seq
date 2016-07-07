@@ -7,9 +7,24 @@ fi
 
 FLAGS="--MEA"
 MOTIF="--motif GAUACCAGCCGAAAGGCCCUUGGCAGC,(...((.(((....)))....))...),-9.22"
+SPACERS=(
+    "None:"
+    "RFP:AACTTTCAGTTTAGCGGTCT"
+    "GFP:CATCTAATTCAACAAGAATT"
+    "AAVS:GGGGCCACTAGGGACAGGAT"
+    "VEGFA:GGGTGGGGGGAGTTTGCTCC"
+)
 
-echo $1 | RNAfold $FLAGS
-mv dot.ps apo.ps
-echo
-echo $1 | RNAfold $FLAGS $MOTIF
-mv dot.ps holo.ps
+for SPACER in "${SPACERS[@]}"; do
+    SPACER_NAME=${SPACER%%:*}
+    SPACER_SEQ=${SPACER#*:}
+
+    echo $SPACER_NAME
+    echo $SPACER_SEQ$1 | RNAfold $FLAGS
+    mv dot.ps "logs/$(lower $SPACER_NAME)_apo.ps"
+    echo
+    echo $SPACER_SEQ$1 | RNAfold $FLAGS $MOTIF
+    mv dot.ps "logs/$(lower $SPACER_NAME)_holo.ps"
+    echo
+done
+

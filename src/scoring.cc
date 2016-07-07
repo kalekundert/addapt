@@ -65,11 +65,6 @@ ViennaRnaFold::~ViennaRnaFold() {
 	}
 }
 
-char const *
-ViennaRnaFold::base_pair_string() const {
-	return my_fold;
-}
-
 double
 ViennaRnaFold::base_pair_prob(int a, int b) const {
 	auto indices = normalize_range(my_seq, a, b, IndexEnum::ITEM);
@@ -79,18 +74,13 @@ ViennaRnaFold::base_pair_prob(int a, int b) const {
 	return (i != j) ? my_fc->exp_matrices->probs[my_fc->iindx[i] - j] : 0;
 }
 	
+char const *
+ViennaRnaFold::base_pair_string() const {
+	return my_fold;
+}
+
 
 ScoreFunction::ScoreFunction() {}
-
-void 
-ScoreFunction::add_term(ScoreTermPtr term) {
-	my_terms.push_back(term);
-}
-
-void 
-ScoreFunction::operator+=(ScoreTermPtr term) {
-	add_term(term);
-}
 
 double
 ScoreFunction::evaluate(ConstructConstPtr sgrna) const {
@@ -118,6 +108,75 @@ ScoreFunction::evaluate(
 	}
 
 	return score;
+}
+
+void 
+ScoreFunction::add_term(ScoreTermPtr term) {
+	my_terms.push_back(term);
+}
+
+void 
+ScoreFunction::operator+=(ScoreTermPtr term) {
+	add_term(term);
+}
+
+
+VariedSpacerScoreFunction::VariedSpacerScoreFunction() {}
+
+VariedSpacerScoreFunction::VariedSpacerScoreFunction(
+		vector<string> spacers): my_spacers(spacers) {}
+
+double
+VariedSpacerScoreFunction::evaluate(
+		ConstructConstPtr sgrna,
+		EvaluatedScoreFunction &table) const {
+
+	double score = 0;
+	int N = my_spacers.size();
+
+	// Return 0 if no spacers where specified.  Maybe this should throw, but my 
+	// instinct is that it's better to return a sensible value.
+	if(N == 0) { return 0; }
+	
+	// Score the sgRNA with all the spacers this score function knows about.
+	table.clear();
+	for(string spacer: my_spacers) {
+		ConstructPtr sgrna_i = sgrna->copy();
+		EvaluatedScoreFunction table_i;
+
+		sgrna_i->domain("spacer")->seq(spacer);
+		score += ScoreFunction::evaluate(sgrna_i, table_i);
+
+		// Copy the score table entries into the "real" score table.
+		for(auto &row: table_i) {
+			row.name += spacer + ": " + row.name;
+			row.term /= N;
+			table.push_back(row);
+		}
+	}
+
+	// Normalize the score by the number of spacers.
+	return score / N;
+}
+
+vector<string>
+VariedSpacerScoreFunction::spacers() const {
+	return my_spacers;
+}
+
+void
+VariedSpacerScoreFunction::spacers(vector<string> spacers) {
+	my_spacers = spacers;
+}
+
+void
+VariedSpacerScoreFunction::add_spacer(string spacer) {
+	my_spacers.push_back(spacer);
+}
+
+void
+VariedSpacerScoreFunction::operator+=(string spacer) {
+	add_spacer(spacer);
 }
 
 
