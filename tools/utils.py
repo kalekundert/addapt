@@ -21,10 +21,10 @@ def pick_best_seqs(tsv_paths, window_size):
 def pick_best_scores(scores, window_size):
     peaks = []
     scores = np.array(scores)
-    BLOCKED = -1
+    BLOCKED = np.min(scores)
+    THRESHOLD = np.percentile(scores, 75)
 
-
-    while scores.max() != BLOCKED:
+    while scores.max() > THRESHOLD:
         i = scores.argmax()
         peaks.append(i)
 
