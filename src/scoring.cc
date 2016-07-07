@@ -149,7 +149,7 @@ VariedSpacerScoreFunction::evaluate(
 
 		// Copy the score table entries into the "real" score table.
 		for(auto &row: table_i) {
-			row.name += spacer + ": " + row.name;
+			row.name = spacer + ": " + row.name;
 			row.term /= N;
 			table.push_back(row);
 		}
