@@ -40,6 +40,10 @@ Options:
     annealing schedule (e.g. "5 10=>0"), or schedule that tries to achieve 
     a certain acceptance rate (e.g. "auto 50%").
     
+  -u --ruler-len <nucs>          [default: 7]
+    The length of the domain between the nexus and the hairpin.  Only values 
+    from 2-7 are allowed.  The default is 7, which is the wildtype length.
+    
   -r --random-seed <seed>        [default: 0]
     The seed for the random number generator.  If running in parallel, this 
     should be different for each job.
@@ -70,13 +74,24 @@ enum class FavorWtEnum {
 
 
 ConstructPtr
-build_mh_sgrna(vector<string> &mutable_domains) {
+build_mh_sgrna(int ruler_len, vector<string> &mutable_domains) {
 	ColorEnum GREEN = ColorEnum::GREEN;
 	ColorEnum RED = ColorEnum::RED;
 	ColorEnum MAGENTA = ColorEnum::MAGENTA;
 	ColorEnum BLUE = ColorEnum::BLUE;
 	ColorEnum YELLOW = ColorEnum::YELLOW;
 	StyleEnum BOLD = StyleEnum::BOLD;
+
+	string ruler_seq;
+	switch(ruler_len) {
+		case 7: ruler_seq = "GUUAUCA"; break;
+		case 6: ruler_seq = "GUAUCA"; break;
+		case 5: ruler_seq = "GUUCA"; break;
+		case 4: ruler_seq = "GUCA"; break;
+		case 3: ruler_seq = "GUA"; break;
+		case 2: ruler_seq = "GU"; break;
+		default: throw (f("the ruler must be 2-7 nucleotides, not %d") % ruler_len).str();
+	}
 
 	ConstructPtr sgrna = make_shared<Construct>();
 
@@ -92,7 +107,7 @@ build_mh_sgrna(vector<string> &mutable_domains) {
 	*sgrna += make_shared<Domain>("nexus/b", "gg", RED);
 	*sgrna += make_shared<Domain>("nexus/c", "CUAGU", RED, BOLD);
 	*sgrna += make_shared<Domain>("nexus/d", "cc", RED);
-	*sgrna += make_shared<Domain>("ruler", "GUAUCA", MAGENTA, BOLD);
+	*sgrna += make_shared<Domain>("ruler", ruler_seq, MAGENTA, BOLD);
 	*sgrna += make_shared<Domain>("hairpin/a", "ACU", BLUE, BOLD);
 	*sgrna += make_shared<Domain>("aptamer", "gauaccagccgaaaggcccuuggcagc", YELLOW);
 	*sgrna += make_shared<Domain>("hairpin/b", "AGU", BLUE, BOLD);
@@ -110,7 +125,7 @@ build_mh_scorefxn(
 		ConstructConstPtr wt,
 		vector<string> mutable_domains,
 		ScorefxnEnum style=ScorefxnEnum::SPECIFIC,
-		FavorWtEnum favor_wt=FavorWtEnum::YES) {
+		FavorWtEnum favor_wt=FavorWtEnum::NO) {
 
 	ScoreFunctionPtr scorefxn = make_shared<ScoreFunction>();
 
@@ -216,10 +231,10 @@ int main(int argc, char **argv) {
 				USAGE+1, {argv + 1, argv + argc}, true, "0.0");
 
 		vector<string> mutable_domains;
-		ConstructPtr mh = build_mh_sgrna(mutable_domains);
+		ConstructPtr mh = build_mh_sgrna(
+				stoi(args["--ruler-len"].asString()), mutable_domains);
 		ConstructPtr wt = mh->copy();
-		ScoreFunctionPtr scorefxn = build_mh_scorefxn(
-				wt, mutable_domains, ScorefxnEnum::SPECIFIC, FavorWtEnum::NO);
+		ScoreFunctionPtr scorefxn = build_mh_scorefxn(wt, mutable_domains);
 		MonteCarloPtr sampler = build_mh_sampler(wt, mutable_domains);
 		ThermostatPtr thermostat = build_thermostat(
 				args["--temperature"].asString());
