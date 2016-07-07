@@ -10,7 +10,7 @@ Options:
         probably be about the auto-correlation time, to ensure that the picked 
         sequences are independent.
 
-    -o --output <path>      [default: mh.pdf]
+    -o --output <path>      [default: logs/mh.pdf]
         The path where the sequence logo should be written.  The file type will 
         be deduced from the extension; valid options are: *.eps *.pdf *.png 
         *.jpeg *.svg
@@ -19,18 +19,6 @@ Options:
 import sys, docopt, tango, utils
 import numpy as np, pandas as pd
 from pprint import pprint
-
-def extract_pick(traj, i):
-    pass
-
-def assemble_seq(traj, i):
-    seq = ''
-    for col in traj.columns:
-        if col.startswith('current_domain'):
-            domain_seq = traj[col][i]
-            if isinstance(domain_seq, str):
-                seq += domain_seq
-    return seq
 
 def make_seqlogo(wt, seqs, path):
     import weblogolib as weblogo
@@ -59,17 +47,8 @@ def make_seqlogo(wt, seqs, path):
         file.write(formatter(data, format))
 
 
-# Print average score...
-
 args = docopt.docopt(__doc__)
-trajectories = args['<trajectories>'] or ['logs/mh.tsv']
-window_size = int(args['--window'])
-sequences = []
+picked_seqs = utils.pick_best_seqs(args['<trajectories>'], int(args['--window']))
+initial_seq = utils.load_initial_seq(args['<trajectories>'])
 
-for tsv_path in trajectories:
-    traj = pd.read_table(tsv_path)
-    peaks = utils.pick_best_scores(traj['current_score'], window_size)
-    sequences += [assemble_seq(traj, i) for i in peaks]
-
-wildtype = assemble_seq(traj, 0)
-make_seqlogo(wildtype, sequences, args['--output'])
+make_seqlogo(initial_seq, [x.seq for x in picked_seqs], args['--output'])

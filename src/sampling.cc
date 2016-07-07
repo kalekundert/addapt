@@ -353,6 +353,13 @@ TsvTrajectoryReporter::start(MonteCarloStep const & step) {
 		throw (f("couldn't open '%s' for writing") % my_path).str();
 	}
 
+	// Record parameters that apply to the whole trajectory.  All the lines in 
+	// this section are prefixed with '#' so they won't be parsed by pandas as 
+	// part of the trajectory.
+
+	my_tsv << "#\t" << "initial_seq\t" << step.current_sgrna->seq() << "\n";
+
+	// Write the column 
 	my_tsv << "step\t";
 	my_tsv << "num_steps\t";
 	my_tsv << "current_score\t";

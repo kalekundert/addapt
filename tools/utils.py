@@ -4,10 +4,25 @@ import numpy as np
 import pandas as pd
 
 def load_trajectory(tsv_path):
-    return pd.read_table(tsv_path or 'logs/mh.tsv')
+    return pd.read_table(tsv_path or 'logs/mh.tsv', comment='#')
 
 def load_trajectories(tsv_paths):
     return [load_trajectory(x) for x in (tsv_paths or [None])]
+
+def load_initial_seq(tsv_path_or_paths):
+    if not tsv_path_or_paths:
+        tsv_path = 'logs/mh.tsv'
+    elif isinstance(tsv_path_or_paths, str):
+        tsv_path = tsv_path_or_paths
+    else:
+        tsv_path = tsv_path_or_paths[0]
+
+    with open(tsv_path) as file:
+        header = file.readline()
+        if header.startswith('#'):
+            _, label, value = header.split('\t')
+            if label == 'initial_seq':
+                return value
 
 def pick_best_seqs(tsv_paths, window_size):
     best_seqs = []
