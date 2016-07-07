@@ -41,7 +41,8 @@ def make_seqlogo(wt, seqs, path):
     seqs = weblogo.SeqList(seqs, alphabet=weblogo.std_alphabets['rna'])
     data = weblogo.LogoData.from_seqs(seqs)
     options = weblogo.LogoOptions()
-    options.fineprint = 'N={}'.format(len(seqs))
+    options.logo_title = '{}  (N={})'.format(path, len(seqs))
+    options.show_fineprint = False
     options.unit_name = 'probability'
     options.color_scheme = ColorScheme([
         RefSeqColor(wt, '#dfe0e0'),
