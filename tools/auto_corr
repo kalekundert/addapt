@@ -13,9 +13,7 @@ Options:
         simulation to account for equilibration.
 """
 
-import docopt
-import tango
-import pandas as pd
+import docopt, utils, tango
 from pylab import *
 from pprint import pprint
 
@@ -23,8 +21,8 @@ from os import fork
 if fork(): raise SystemExit
 
 args = docopt.docopt(__doc__)
+traj = utils.load_trajectory(args['<trajectory>'])
 traj_name = args['<trajectory>'] or 'logs/mh.tsv'
-traj = pd.read_table(traj_name)
 steps = int(args['--steps'])
 discard = int(args['--discard'])
 
@@ -36,7 +34,7 @@ def _autocorr(x, k):
     return sum(x[i+k] == x[i] for i in range(N)) / N
 
 
-domains = 'nexus/b', 'ruler', 'hairpin/a', 'hairpin/b'
+domains = 'nexus/c', 'ruler', 'hairpin/a', 'hairpin/b'
 labels = []
 
 for i, domain in enumerate(domains):

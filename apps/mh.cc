@@ -65,6 +65,7 @@ Options:
 enum class ScorefxnEnum {
 	GENERAL,
 	SPECIFIC,
+	ACTIVE,
 };
 
 enum class FavorWtEnum {
@@ -92,26 +93,30 @@ build_mh_sgrna(int ruler_len, vector<string> &mutable_domains) {
 		case 2: ruler_seq = "GU"; break;
 		default: throw (f("the ruler must be 2-7 nucleotides, not %d") % ruler_len).str();
 	}
+	string ruler_cst(ruler_seq.length(), 'x');
 
 	ConstructPtr sgrna = make_shared<Construct>();
 
 	*sgrna += make_shared<Domain>("spacer", "");
-	*sgrna += make_shared<Domain>("lower_stem/a", "guuuua", GREEN);
+	*sgrna += make_shared<Domain>("lower_stem/a", "guuuua", "(.....", GREEN);
 	*sgrna += make_shared<Domain>("bulge/a", "ga", GREEN);
 	*sgrna += make_shared<Domain>("upper_stem/a", "gcua", GREEN);
 	*sgrna += make_shared<Domain>("upper_stem/b", "gaaa", GREEN);
 	*sgrna += make_shared<Domain>("upper_stem/c", "uagc", GREEN);
 	*sgrna += make_shared<Domain>("bulge/b", "aagu", GREEN);
-	*sgrna += make_shared<Domain>("lower_stem/b", "uaaaau", GREEN);
-	*sgrna += make_shared<Domain>("nexus/a", "aa", RED);
+	*sgrna += make_shared<Domain>("lower_stem/b", "uaaaau", ".....)", GREEN);
+	*sgrna += make_shared<Domain>("nexus/a", "aa", "xx", RED);
 	*sgrna += make_shared<Domain>("nexus/b", "gg", RED);
-	*sgrna += make_shared<Domain>("nexus/c", "CUAGU", RED, BOLD);
+	*sgrna += make_shared<Domain>("nexus/c", "CUAGU", "xxxxx", RED, BOLD);
 	*sgrna += make_shared<Domain>("nexus/d", "cc", RED);
-	*sgrna += make_shared<Domain>("ruler", ruler_seq, MAGENTA, BOLD);
-	*sgrna += make_shared<Domain>("hairpin/a", "ACU", BLUE, BOLD);
+	*sgrna += make_shared<Domain>("ruler", ruler_seq, ruler_cst, MAGENTA, BOLD);
+	*sgrna += make_shared<Domain>("hairpin/a", "ACU", "(..", BLUE, BOLD);
 	*sgrna += make_shared<Domain>("aptamer", "gauaccagccgaaaggcccuuggcagc", YELLOW);
-	*sgrna += make_shared<Domain>("hairpin/b", "AGU", BLUE, BOLD);
-	*sgrna += make_shared<Domain>("tail", "ggcaccgagucggugcuuuuuu", BLUE);
+	*sgrna += make_shared<Domain>("hairpin/b", "AGU", "..)", BLUE, BOLD);
+	*sgrna += make_shared<Domain>("tail/a", "ggcaccg", ".(.....", BLUE);
+	*sgrna += make_shared<Domain>("tail/b", "agu", BLUE);
+	*sgrna += make_shared<Domain>("tail/c", "cggugc", ".....)", BLUE);
+	*sgrna += make_shared<Domain>("tail/d", "uuuuuu", BLUE);
 
 	mutable_domains = {
 		"nexus/c", "ruler", "hairpin/a", "hairpin/b"
@@ -125,7 +130,7 @@ build_mh_scorefxn(
 		ConstructConstPtr wt,
 		vector<string> mutable_domains,
 		vector<string> spacers,
-		ScorefxnEnum style=ScorefxnEnum::SPECIFIC,
+		ScorefxnEnum style=ScorefxnEnum::ACTIVE,
 		FavorWtEnum favor_wt=FavorWtEnum::NO) {
 
 	ScoreFunctionPtr scorefxn;
@@ -146,7 +151,6 @@ build_mh_scorefxn(
 
 		case ScorefxnEnum::GENERAL:
 			// Fold differently with the ligand than without it.
-
 			*scorefxn += ScoreTermPtr(new LigandSensitivityTerm(
 					"ligand_sensitivity",
 					{"nexus/b", "nexus/c", "nexus/d", "ruler", "hairpin/a", "hairpin/b"}
@@ -156,7 +160,6 @@ build_mh_scorefxn(
 
 		case ScorefxnEnum::SPECIFIC:
 			// Desired fold *without* ligand.
-
 			*scorefxn += ScoreTermPtr(new ConditionallyPairedTerm(
 					"paired/apo/nexus",
 					ConditionEnum::APO,
@@ -179,7 +182,6 @@ build_mh_scorefxn(
 			));
 
 			// Desired fold *with* ligand.
-
 			*scorefxn += ScoreTermPtr(new ConditionallyUnpairedTerm(
 					"unpaired/holo/nexus",
 					ConditionEnum::HOLO,
@@ -203,7 +205,6 @@ build_mh_scorefxn(
 			));
 
 			// Desired fold *with and without* ligand.
-
 			*scorefxn += ScoreTermPtr(new AlwaysUnpairedTerm(
 						"unpaired/always/spacer",
 						{"spacer"}
@@ -214,6 +215,13 @@ build_mh_scorefxn(
 					{"lower_stem/a"},
 					{"lower_stem/b"}
 			));
+
+			break;
+
+		case ScorefxnEnum::ACTIVE:
+			// Increase the probability of adopting the active fold in the holo 
+			// condition.
+			*scorefxn += make_shared<ActiveMacrostateTerm>();
 
 			break;
 	}

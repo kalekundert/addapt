@@ -6,16 +6,29 @@ using namespace std;
 using namespace sgrna_design;
 
 TEST_CASE("Test the Domain constructor", "[model]") {
-	Domain theo(
+	Domain theo_1(
 			"aptamer",
 			"GAUACCAGCCGAAAGGCCCUUGGCAGC",
 			ColorEnum::YELLOW,
 			StyleEnum::BOLD);
 
-	CHECK(theo.name() == "aptamer");
-	CHECK(theo.seq() == "GAUACCAGCCGAAAGGCCCUUGGCAGC");
-	CHECK(theo.color() == ColorEnum::YELLOW);
-	CHECK(theo.style() == StyleEnum::BOLD);
+	CHECK(theo_1.name() == "aptamer");
+	CHECK(theo_1.seq() == "GAUACCAGCCGAAAGGCCCUUGGCAGC");
+	CHECK(theo_1.active() == "...........................");
+	CHECK(theo_1.color() == ColorEnum::YELLOW);
+	CHECK(theo_1.style() == StyleEnum::BOLD);
+
+	Domain theo_2(
+			"aptamer",
+			"GAUACCAGCCGAAAGGCCCUUGGCAGC",
+			"(.........................)");
+
+	CHECK(theo_2.name() == "aptamer");
+	CHECK(theo_2.seq() == "GAUACCAGCCGAAAGGCCCUUGGCAGC");
+	CHECK(theo_2.active() == "(.........................)");
+	CHECK(theo_2.color() == ColorEnum::NORMAL);
+	CHECK(theo_2.style() == StyleEnum::NORMAL);
+
 }
 
 TEST_CASE("Test the Domain::mutate method", "[model]") {

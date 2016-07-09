@@ -40,6 +40,9 @@ public:
 	/// @brief Return the sequence represented by this object.
 	virtual string seq() const = 0;
 
+	/// @brief Return constraints that define the active state of this sequence.
+	virtual string active() const = 0;
+
 	/// @brief Return the length of the sequence.
 	int len() const;
 
@@ -52,7 +55,21 @@ public:
 	/// @brief Default constructor.
 	Domain(
 			string const name,
-			string const seq="",
+			ColorEnum color=ColorEnum::NORMAL,
+			StyleEnum style=StyleEnum::NORMAL);
+
+	/// @brief Default constructor.
+	Domain(
+			string const name,
+			string const seq,
+			ColorEnum color=ColorEnum::NORMAL,
+			StyleEnum style=StyleEnum::NORMAL);
+
+	/// @brief Default constructor.
+	Domain(
+			string const name,
+			string const seq,
+			string const active,
 			ColorEnum color=ColorEnum::NORMAL,
 			StyleEnum style=StyleEnum::NORMAL);
 
@@ -72,7 +89,10 @@ public:
 	char seq(int) const;
 
 	/// @brief Set the sequence of this domain.
-	void seq(string const);
+	void seq(string const, string const="");
+
+	/// @brief Return constraints that define the active state of this domain.
+	string active() const;
 
 	/// @brief Make a point mutation in this domain.
 	void mutate(int, char);
@@ -112,6 +132,7 @@ private:
 
 	string my_name;
 	string my_seq;
+	string my_active;
 	ColorEnum my_color;
 	StyleEnum my_style;
 
@@ -138,6 +159,9 @@ public:
 
 	/// @brief Return the sequence of this construct.
 	string seq() const;
+
+	/// @brief Return constraints that define the active state of this construct.
+	string active() const;
 
 	/// @brief Return the domains that make up this construct.
 	DomainMultiIndex domains() const;

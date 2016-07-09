@@ -7,6 +7,7 @@ extern "C" {
   #include <ViennaRNA/structure_utils.h>
   #include <ViennaRNA/part_func.h>
   #include <ViennaRNA/fold.h>
+	#include <ViennaRNA/constraints.h>
 }
 
 #include <sgrna_design/scoring.hh>
@@ -16,28 +17,82 @@ namespace sgrna_design {
 ViennaRnaFold::ViennaRnaFold(ConstructConstPtr sgrna, LigandEnum ligand):
 
 	my_sgrna(sgrna),
-	my_seq(sgrna->seq()) {
+	my_seq(sgrna->seq()),
+	my_ligand(ligand),
+	my_bppm_fc(nullptr) {
 
 	// Upper-casing the sequence is critically important!  Without this step, 
 	// ViennaRNA will silently produce incorrect results.  I realized I needed to 
 	// do this by carefully reading RNAfold.c when I realized that rhf(6) wasn't 
 	// being folded correctly.
 	boost::to_upper(my_seq);
+}
 
-	my_fc = vrna_fold_compound(
-			my_seq.c_str(), NULL, VRNA_OPTION_MFE | VRNA_OPTION_PF);
+ViennaRnaFold::~ViennaRnaFold() {
+	for(auto fc: my_fcs) {
+		vrna_fold_compound_free(fc);
+	}
+}
 
-	my_fold = new char [my_seq.length() + 1];
+double
+ViennaRnaFold::base_pair_prob(int a, int b) const {
+	// Perform the partition function calculation if this is the first time a 
+	// base-pair probability is being requested.  Cache the result.
+	if(my_bppm_fc == nullptr) {
+		my_bppm_fc = make_fold_compound(true);
+		vrna_pf(my_bppm_fc, NULL);
+	}
 
+	auto indices = normalize_range(my_seq, a, b, IndexEnum::ITEM);
+	int i = indices.first + 1; // The ViennaRNA matrices are 1-indexed.
+	int j = indices.second + 1;
+	double *bppm = my_bppm_fc->exp_matrices->probs;
+	return (i != j) ? bppm[my_bppm_fc->iindx[i] - j] : 0;
+}
+	
+double
+ViennaRnaFold::macrostate_prob(string macrostate) const {
+	vrna_fold_compound_t *fc = make_fold_compound(false);
+
+	// Calculate the free energy for the whole ensemble.
+	double g_tot = vrna_pf(fc, NULL);
+
+	// Add a constraint that defines the "active" macrostate.
+	vrna_constraints_add(fc, macrostate.c_str(),
+			VRNA_CONSTRAINT_DB_DEFAULT | VRNA_CONSTRAINT_DB_ENFORCE_BP);
+
+	// Calculate the free energy for the "active" macrostate.
+	double g_active = vrna_pf(fc, NULL);
+
+	// Return the probability that the construct will be in the "active" 
+	// macrostate at equilibrium.
+	double kT = fc->exp_params->kT / 1000;
+	return exp((g_tot - g_active) / kT);
+}
+
+vrna_fold_compound_t *
+ViennaRnaFold::make_fold_compound(bool compute_bppm) const {
+	// Tell ViennaRNA not to calculate the base-pair probability matrix (BPPM) if 
+	// we won't be using it.
+	vrna_md_t md;
+	vrna_md_set_default(&md);
+  md.backtrack = compute_bppm;
+	md.compute_bpp = compute_bppm;
+
+	// Create a new "fold compound" data structure and store a pointer to it so 
+	// it can be deallocated later.
+	vrna_fold_compound_t *fc =
+		vrna_fold_compound(my_seq.c_str(), &md, VRNA_OPTION_PF);
+	my_fcs.push_back(fc);
+
+	// Add the aptamer motif.
 	char const *aptamer_seq = NULL;
 	char const *aptamer_fold = NULL;
 	double aptamer_kd_uM = 0;
 
-	switch(ligand) {
-
+	switch(my_ligand) {
 		case LigandEnum::NONE :
 			break;
-
 		case LigandEnum::THEO :
 			aptamer_seq =  "GAUACCAGCCGAAAGGCCCUUGGCAGC";
 			aptamer_fold = "(...((.(((....)))....))...)";
@@ -48,35 +103,13 @@ ViennaRnaFold::ViennaRnaFold(ConstructConstPtr sgrna, LigandEnum ligand):
 	if (aptamer_seq) {
 		//double rt_37 = 1.9858775e-3 * 310;  // kcal/mol at 37°C
 		//double std_conc = 1e6;              // 1M in μM
-		double kT = my_fc->exp_params->kT / 1000;
+		double kT = fc->exp_params->kT / 1000;
 		double aptamer_dg = kT * log(aptamer_kd_uM / 1e6);
 		vrna_sc_add_hi_motif(
-				my_fc, aptamer_seq, aptamer_fold, aptamer_dg, VRNA_OPTION_DEFAULT);
+				fc, aptamer_seq, aptamer_fold, aptamer_dg, VRNA_OPTION_DEFAULT);
 	}
 
-	vrna_pf(my_fc, my_fold);
-
-}
-
-ViennaRnaFold::~ViennaRnaFold() {
-	if (my_fc) {
-		vrna_fold_compound_free(my_fc);
-		delete [] my_fold;
-	}
-}
-
-double
-ViennaRnaFold::base_pair_prob(int a, int b) const {
-	auto indices = normalize_range(my_seq, a, b, IndexEnum::ITEM);
-	// The ViennaRNA matrices are 1-indexed.
-	int i = indices.first + 1;
-	int j = indices.second + 1;
-	return (i != j) ? my_fc->exp_matrices->probs[my_fc->iindx[i] - j] : 0;
-}
-	
-char const *
-ViennaRnaFold::base_pair_string() const {
-	return my_fold;
+	return fc;
 }
 
 
@@ -254,7 +287,25 @@ FavorWildtypeTerm::evaluate(
 }
 
 
-// All of these score terms have the same general form:
+ActiveMacrostateTerm::ActiveMacrostateTerm(double weight):
+	ScoreTerm("active_macrostate", weight) {}
+
+double
+ActiveMacrostateTerm::evaluate(
+		ConstructConstPtr sgrna,
+		RnaFold const &apo_fold,
+		RnaFold const &holo_fold) const {
+
+	double p_apo = apo_fold.macrostate_prob(sgrna->active());
+	double p_holo = holo_fold.macrostate_prob(sgrna->active());
+
+	// Return the natural logarithm of the calculated probability so this score 
+	// term can be properly added to others.
+	return log(1 - p_apo) + log(p_holo);
+}
+
+
+// Most of these score terms have the same general form:
 //
 // Sum[
 //  Prob{desired fold} × log(Enrichment{desired fold over undesired fold})

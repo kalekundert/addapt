@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <list>
 
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/random_access_index.hpp>
@@ -47,6 +48,11 @@ public:
 	/// with each other.
 	virtual double base_pair_prob(int, int) const = 0;
 
+	/// @brief Return the probability that the construct passed to the 
+	/// constructor will fold into the given macrostate, defined by a hard 
+	/// constraint string.
+	virtual double macrostate_prob(string) const = 0;
+
 };
 
 class ViennaRnaFold : public RnaFold {
@@ -63,18 +69,29 @@ public:
 	/// with each other.
 	double base_pair_prob(int, int) const;
 
-	/// @brief Return a string depicting the predicted structure for this 
-	/// sequence.
-	const char *base_pair_string() const;
+	/// @brief Return the probability that the construct passed to the 
+	/// constructor will fold into the given macrostate, defined by a hard 
+	/// constraint string.
+	double macrostate_prob(string) const;
+
+private:
+
+	vrna_fold_compound_t *make_fold_compound(bool) const;
 
 private:
 
 	ConstructConstPtr my_sgrna;
-	// We need to store our own copy of the sgRNA sequence to prevent the pointer 
-	// returned by c_str() from getting deleted.
+	// We need to store our own copy of the sgRNA sequence to ensure that the 
+	// pointer returned by c_str() is valid.
 	string my_seq;
-	vrna_fold_compound_t *my_fc;
-	char *my_fold;
+	LigandEnum my_ligand;
+
+	// We need to store a list of all the fold compound data structures we end up 
+	// creating so we can deallocate them all.
+	mutable list<vrna_fold_compound_t *> my_fcs;
+
+	// We need a fold compound object to cache the base-pair probability matrix.
+	mutable vrna_fold_compound_t *my_bppm_fc;
 };
 
 
@@ -194,6 +211,17 @@ private:
 
 };
 
+class ActiveMacrostateTerm : public ScoreTerm {
+
+public:
+
+	ActiveMacrostateTerm(double=1.0);
+
+	double evaluate(
+			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+
+};
+
 class LigandSensitivityTerm : public ScoreTerm {
 
 public:
@@ -279,6 +307,7 @@ private:
 	vector<string> my_selection;
 
 };
+
 
 
 }

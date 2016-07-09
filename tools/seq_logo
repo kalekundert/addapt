@@ -31,7 +31,7 @@ def make_seqlogo(wt, seqs, path):
     options = weblogo.LogoOptions()
     options.logo_title = '{}  (N={})'.format(path, len(seqs))
     options.show_fineprint = False
-    options.unit_name = 'probability'
+    #options.unit_name = 'probability'
     options.color_scheme = ColorScheme([
         RefSeqColor(wt, '#dfe0e0'),
         SymbolColor("GC", '#178ccb'),

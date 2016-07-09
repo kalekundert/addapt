@@ -6,6 +6,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <list>
 
 #include <boost/format.hpp>
 
@@ -15,6 +16,7 @@ using f = boost::format;
 using std::make_shared;
 using std::string;
 using std::vector;
+using std::list;
 using std::pair;
 
 /// @brief Do the indices refer to the items in the collection themselves, or 

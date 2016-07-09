@@ -13,6 +13,8 @@ class DummyRnaFold : public RnaFold {
 
 public:
 
+	DummyRnaFold(): dg(0) {}
+
 	double &
 	operator[](bp key) {
 		key = {
@@ -28,6 +30,14 @@ public:
 		return (it != my_base_pair_probs.end())? it->second : 0.0;
 	}
 
+	double
+	macrostate_prob(string) const {
+		return dg;
+	}
+
+public:
+	double dg;
+
 private:
 	map<bp,double> my_base_pair_probs;
 
@@ -42,17 +52,17 @@ build_rhf_6_construct() {
 	// (((((((.((((....))))...))))))).,,({{,{..|||{{(,((,{....,.||{}}}})),..,}))).,,||.(((((((...)))))))..... [ΔG=-29.58 kcal/mol, apo]
 	// (((((((.((((....))))...))))))){(((......)))}..{{.((...((.(((....)))....))...)).}|((((((...)))))),..... [ΔG=-33.82 kcal/mol, holo]
 
-	*rhf_6 += make_shared<Domain>("lower_stem/a", "guuuua");
+	*rhf_6 += make_shared<Domain>("lower_stem/a", "guuuua", "(.....");
 	*rhf_6 += make_shared<Domain>("upper_stem", "gagcuagaaauagcaagu");
-	*rhf_6 += make_shared<Domain>("lower_stem/b", "uaaaau");
-	*rhf_6 += make_shared<Domain>("nexus/x", "aagg");
-	*rhf_6 += make_shared<Domain>("nexus/y", "cuagu");
-	*rhf_6 += make_shared<Domain>("nexus/z", "ccCuU");
-	*rhf_6 += make_shared<Domain>("ruler", "UUC");
-	*rhf_6 += make_shared<Domain>("hairpin/u", "GCC");
+	*rhf_6 += make_shared<Domain>("lower_stem/b", "uaaaau", ".....)");
+	*rhf_6 += make_shared<Domain>("nexus/x", "aagg", "xx..");
+	*rhf_6 += make_shared<Domain>("nexus/y", "cuagu", "xxxxx");
+	*rhf_6 += make_shared<Domain>("nexus/z", "ccCuU", "..xxx");
+	*rhf_6 += make_shared<Domain>("ruler", "UUC", "xxx");
+	*rhf_6 += make_shared<Domain>("hairpin/u", "GCC", "(..");
 	*rhf_6 += make_shared<Domain>("aptamer", "gauaccagccgaaaggcccuuggcagc");
-	*rhf_6 += make_shared<Domain>("hairpin/v", "GAC");
-	*rhf_6 += make_shared<Domain>("tail", "ggcaccgagucggugcuuuuuu");
+	*rhf_6 += make_shared<Domain>("hairpin/v", "GAC", "..)");
+	*rhf_6 += make_shared<Domain>("tail", "ggcaccgagucggugcuuuuuu", ".(.............)......");
 
 	return rhf_6;
 }
@@ -82,9 +92,9 @@ TEST_CASE("Test folding a hairpin without an aptamer", "[scoring]") {
 	// ((((....)))) [ΔG=-2.20 kcal/mol]
 
 	ConstructPtr hairpin = make_shared<Construct>();
-	*hairpin += make_shared<Domain>("stem/a", "ACGU");
-	*hairpin += make_shared<Domain>("loop", "GAAA");
-	*hairpin += make_shared<Domain>("stem/b", "ACGU");
+	*hairpin += make_shared<Domain>("stem/a", "ACGU", "(...");
+	*hairpin += make_shared<Domain>("loop", "GAAA", "....");
+	*hairpin += make_shared<Domain>("stem/b", "ACGU", "...)");
 
 	// Indicate which base pairs I expect to find.
 	set<bp> expected_base_pairs = {{0,11}, {1,10}, {2,9}, {3,8}};
@@ -97,7 +107,7 @@ TEST_CASE("Test folding a hairpin without an aptamer", "[scoring]") {
 
 	ViennaRnaFold fold(hairpin);
 
-	SECTION("the expected base pairs form") {
+	SECTION("the expected base pairs probabilities are correct") {
 		for(int i = 0; i < hairpin->len(); i++) {
 			for(int j = i; j < hairpin->len(); j++) {
 				double p = fold.base_pair_prob(i, j);
@@ -113,7 +123,7 @@ TEST_CASE("Test folding a hairpin without an aptamer", "[scoring]") {
 		}
 	}
 
-	SECTION("the order of the indices doesn't matter") {
+	SECTION("the order of the base pairs doesn't matter") {
 		for(int i = 0; i < hairpin->len(); i++) {
 			for(int j = i; j < hairpin->len(); j++) {
 				double ij = fold.base_pair_prob(i, j);
@@ -123,9 +133,23 @@ TEST_CASE("Test folding a hairpin without an aptamer", "[scoring]") {
 		}
 	}
 
-	SECTION("out-of-bounds indices throw exceptions") {
+	SECTION("out-of-bounds base pair indices throw exceptions") {
 		CHECK_THROWS(fold.base_pair_prob(0, 12));
 		CHECK_THROWS(fold.base_pair_prob(0, -13));
+	}
+
+	SECTION("the macrostate probabilities are correct") {
+		CHECK(fold.macrostate_prob("((((xxxx))))") > 0.65);
+		CHECK(fold.macrostate_prob("((((....))))") > 0.65);
+		CHECK(fold.macrostate_prob("(..........)") > 0.65);
+
+		CHECK(fold.macrostate_prob("...(xxxx)...") > 0.95);
+		CHECK(fold.macrostate_prob("...(....)...") > 0.95);
+		CHECK(fold.macrostate_prob("...(....)...") > 0.95);
+
+		CHECK(fold.macrostate_prob("xxxxxxxxxxxx") < 0.05);
+		CHECK(fold.macrostate_prob("xxxx........") < 0.05);
+		CHECK(fold.macrostate_prob("........xxxx") < 0.05);
 	}
 }
 
@@ -170,6 +194,12 @@ TEST_CASE("Test folding a hairpin with an aptamer", "[scoring]") {
 			}
 		}
 	}
+
+	// Make sure the various macrostates have the expected populations.
+	CHECK(apo_fold.macrostate_prob("....((((((....)))...)))....") > 0.65);
+	CHECK(apo_fold.macrostate_prob("(.........................)") < 0.05);
+	CHECK(holo_fold.macrostate_prob("....((((((....)))...)))....") < 0.01);
+	CHECK(holo_fold.macrostate_prob("(.........................)") > 0.95);
 }
 
 TEST_CASE("Test folding rhf(6)", "[scoring]") {
@@ -228,6 +258,12 @@ TEST_CASE("Test folding rhf(6)", "[scoring]") {
 		CHECK(apo_fold.base_pair_prob(i,j) < apo_threshold);
 		CHECK(holo_fold.base_pair_prob(i,j) > holo_threshold);
 	}
+	
+	// Make sure the various macrostates have the expected populations.
+	CAPTURE(rhf_6->seq());
+	CAPTURE(rhf_6->active());
+	CHECK(apo_fold.macrostate_prob(rhf_6->active()) < 7e-5);
+	CHECK(holo_fold.macrostate_prob(rhf_6->active()) > 4e-3);
 }
 
 TEST_CASE("Test the score function class", "[scoring]") {

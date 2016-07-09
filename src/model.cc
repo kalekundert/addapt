@@ -16,18 +16,37 @@ Sequence::len() const {
 
 Domain::Domain(
 		string const name,
+		ColorEnum color,
+		StyleEnum style):
+	
+	Domain(name, "", "", color, style) {}
+
+Domain::Domain(
+		string const name,
 		string const seq,
 		ColorEnum color,
 		StyleEnum style):
 	
+	Domain(name, seq, "", color, style) {}
+
+Domain::Domain(
+		string const name,
+		string const seq,
+		string const active,
+		ColorEnum color,
+		StyleEnum style):
+	
 	my_name(name),
-	my_seq(seq),
 	my_color(color),
-	my_style(style) {}
+	my_style(style) {
+	
+	Domain::seq(seq, active);
+}
 
 DomainPtr
 Domain::copy() const {
-	return std::make_shared<Domain>(my_name, my_seq, my_color, my_style);
+	return std::make_shared<Domain>(
+			my_name, my_seq, my_active, my_color, my_style);
 }
 
 string
@@ -51,8 +70,24 @@ Domain::seq(int index) const {
 }
 
 void
-Domain::seq(string const seq) {
+Domain::seq(string const seq, string const active) {
 	my_seq = seq;
+
+	if(active.empty()) {
+		my_active = std::string(seq.length(), '.');
+	}
+	else {
+		my_active = active;
+	}
+
+	if(my_seq.length() != my_active.length()) {
+		throw (f("'%s' and '%s' are different lengths.") % my_seq % my_active).str();
+	}
+}
+
+string
+Domain::active() const {
+	return my_active;
 }
 
 void
@@ -136,6 +171,17 @@ Construct::seq() const {
 	}
 
 	return seq;
+}
+
+string
+Construct::active() const {
+	string cst;
+
+	for(DomainPtr domain: my_domains) {
+		cst += domain->active();
+	}
+
+	return cst;
 }
 
 DomainMultiIndex
