@@ -10,18 +10,34 @@ Options:
         probably be about the auto-correlation time, to ensure that the picked 
         sequences are independent.
 
-    -s --explain-scores
+    -q --header-only
+        Only print out the header information summarizing the picks, don't 
+        print out all the picks themselves.
+
+    -v --explain-scores
         Explain why each picked sequence scored as well as it did by printing 
         out the individual score terms and 2° structure predictions for each.
 """
 
-import docopt, utils
+import docopt, utils, statistics
 from tabulate import tabulate
 from textwrap import indent
 from pprint import pprint
 
 args = docopt.docopt(__doc__)
 best_seqs = utils.pick_best_seqs(args['<trajectories>'], int(args['--window']))
+best_scores = [x.score for x in best_seqs]
+
+print("Num Picks:", len(best_seqs))
+print("Best Score: {:.4f}".format(max(best_scores)))
+print("Worst Score: {:.4f}".format(min(best_scores)))
+print("Average Score: {:.4f} ± {:.4f}".format(
+    statistics.mean(best_scores), statistics.stdev(best_scores)))
+
+if args['--header-only']:
+    raise SystemExit
+
+print()
 
 for pick in best_seqs:
     print('Step:', pick.i)
