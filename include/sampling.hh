@@ -6,9 +6,9 @@
 #include <memory>
 #include <vector>
 
-#include <sgrna_design/model.hh>
-#include <sgrna_design/scoring.hh>
-#include <sgrna_design/utils.hh>
+#include "model.hh"
+#include "scoring.hh"
+#include "utils.hh"
 
 namespace sgrna_design {
 

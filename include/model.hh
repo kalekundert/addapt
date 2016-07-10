@@ -9,7 +9,7 @@
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/mem_fun.hpp>
 
-#include <sgrna_design/utils.hh>
+#include "utils.hh"
 
 namespace sgrna_design {
 

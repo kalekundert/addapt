@@ -1,12 +1,75 @@
+/run_tests
+
+## Data
 *.ps
-build/
-bin/
-tests/run_tests
-logs/
-a.out
-*.gcno
 *.tsv
 *.pdf
 *.eps
 *.svg
-__pycache__
+logs/
+
+## C++
+# Prerequisites
+*.d
+
+# Autotools
+build/*
+!build/aux
+build/aux/*
+!build/aux/test-driver
+!build/m4
+build/m4/lt*.m4
+build/m4/libtool.m4
+.deps
+.dirstamp
+.libs
+aclocal.m4
+autom4te.cache
+config.status
+configure
+libtool
+Makefile
+Makefile.in
+*.log
+*.trs
+*.tar.gz
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Debugging files
+*.gcno
+
+## Python
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+

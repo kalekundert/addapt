@@ -10,10 +10,10 @@ extern "C" {
 
 #include <docopt/docopt.h>
 
-#include <sgrna_design/model.hh>
-#include <sgrna_design/sampling.hh>
-#include <sgrna_design/scoring.hh>
-#include <sgrna_design/utils.hh>
+#include "model.hh"
+#include "sampling.hh"
+#include "scoring.hh"
+#include "utils.hh"
 
 using namespace std;
 using namespace sgrna_design;

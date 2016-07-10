@@ -1,4 +1,4 @@
-#include <sgrna_design/utils.hh>
+#include "utils.hh"
 
 namespace sgrna_design {
 

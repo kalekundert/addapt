@@ -1,9 +1,9 @@
 #include <set>
 #include <vector>
 #include <catch/catch.hpp>
-#include <sgrna_design/model.hh>
-#include <sgrna_design/scoring.hh>
-#include <sgrna_design/utils.hh>
+#include "model.hh"
+#include "scoring.hh"
+#include "utils.hh"
 
 using namespace std;
 using namespace sgrna_design;

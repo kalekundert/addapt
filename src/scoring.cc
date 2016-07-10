@@ -10,7 +10,7 @@ extern "C" {
 	#include <ViennaRNA/constraints.h>
 }
 
-#include <sgrna_design/scoring.hh>
+#include "scoring.hh"
 
 namespace sgrna_design {
 

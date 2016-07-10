@@ -2,11 +2,11 @@
 
 #include <iostream>
 #include <iterator>
+#include <list>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-#include <list>
 
 #include <boost/format.hpp>
 

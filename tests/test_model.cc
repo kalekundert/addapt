@@ -1,6 +1,6 @@
 #include <memory>
 #include <catch/catch.hpp>
-#include <sgrna_design/model.hh>
+#include "model.hh"
 
 using namespace std;
 using namespace sgrna_design;

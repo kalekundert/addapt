@@ -3,8 +3,8 @@
 #include <iostream>
 #include <regex>
 
-#include <sgrna_design/sampling.hh>
-#include <sgrna_design/utils.hh>
+#include "sampling.hh"
+#include "utils.hh"
 
 namespace sgrna_design {
 

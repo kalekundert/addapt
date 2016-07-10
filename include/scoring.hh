@@ -14,7 +14,7 @@ extern "C" {
   #include <ViennaRNA/data_structures.h>
 }
 
-#include <sgrna_design/model.hh>
+#include "model.hh"
 
 namespace sgrna_design {
 

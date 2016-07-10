@@ -1,10 +1,7 @@
 #include <algorithm>
 
-#include <boost/format.hpp>
-using boost::format;
-
-#include <sgrna_design/model.hh>
-#include <sgrna_design/utils.hh>
+#include "model.hh"
+#include "utils.hh"
 
 namespace sgrna_design {
 
@@ -229,7 +226,7 @@ Construct::index(Nucleotide nuc) const {
 		index += domain->len();
 	}
 
-	throw (format("No nucleotide named %s") % nuc.domain).str();
+	throw (f("No nucleotide named %s") % nuc.domain).str();
 }
 
 int
@@ -243,7 +240,7 @@ Construct::index_5(string name) const {
 		index += domain->len();
 	}
 
-	throw (format("No domain named %s") % name).str();
+	throw (f("No domain named %s") % name).str();
 }
 
 int
