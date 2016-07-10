@@ -233,7 +233,8 @@ MonteCarloPtr
 build_mh_sampler(ConstructConstPtr wt, vector<string> mutable_domains) {
 	MonteCarloPtr sampler = make_shared<MonteCarlo>();
 	
-	*sampler += make_shared<MakePointMutation>(mutable_domains);
+	*sampler += make_shared<AutoPointMutation>();
+	//*sampler += make_shared<MakePointMutation>(mutable_domains);
 	//*sampler += make_shared<ChangeDomainLength>("ruler", 4, 7);
 	//*sampler += make_shared<MakeWtReversion>(mutable_domains, wt);
 

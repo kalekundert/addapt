@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <iostream>
 #include <iterator>
 #include <list>
@@ -52,6 +53,11 @@ enum class StyleEnum {
 
 string
 color(string, ColorEnum, StyleEnum);
+
+template <class Container, class Value> bool
+contains(Container c, Value val) {
+	return std::find(c.begin(), c.end(), val) != c.end();
+}
 
 
 }

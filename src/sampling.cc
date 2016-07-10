@@ -1,10 +1,13 @@
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <iostream>
 #include <regex>
 
 #include "sampling.hh"
 #include "utils.hh"
+
+using namespace std;
 
 namespace sgrna_design {
 
@@ -448,6 +451,70 @@ MakePointMutation::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 	int random_i = std::uniform_int_distribution<>(0, random_domain->len()-1)(rng);
 	char random_acgu = "ACGU"[std::uniform_int_distribution<>(0, 3)(rng)];
 	random_domain->mutate(random_i, random_acgu);
+}
+
+
+AutoPointMutation::AutoPointMutation() {}
+
+void
+AutoPointMutation::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
+	vector<int> mutable_positions;
+	map<int,int> base_pairs;
+	string seq = sgrna->seq();
+	string cst = sgrna->active();
+
+	// Decide which positions will be mutated.
+	for(int i = 0; i < seq.length(); i++) {
+
+		// Only mutate positions that are upper case.  This is a simple way for the 
+		// user to indicate which positions should be mutable.
+		if(islower(seq[i])) { continue; }
+
+		// Fill in a list of positions that can be mutated freely.  This includes 
+		// everything except positions that are constrained to be the 3' end of a 
+		// base pairs.
+		if(cst[i] != ')') {
+			mutable_positions.push_back(i);
+		}
+
+		// Fill in a map relating the 5' and 3' ends of any mutable base pairs.  
+		// The 3' end will not be mutated on its own, but it will be updated when 
+		// the 5' end is mutated.
+		else {
+
+			// Backtrack to find the 5' side of the base pair.
+			int j = i, bp = 1;
+			while(bp != 0) {
+				j -= 1;
+				bp += (cst[j] == ')');
+				bp -= (cst[j] == '(');
+			}
+
+			// Make sure that the 5' side is mutable.
+			if(not contains(mutable_positions, j)) {
+				throw (f("position '%d' can be mutated, but it's base-paired to position '%d' which can't be.") % i % j).str();
+			}
+
+			// Add an entry to the ``base_pairs`` map.
+			base_pairs.insert({j, i});
+		}
+	}
+
+	// Mutate a randomly chosen position to a randomly chosen base.
+	int random_i = mutable_positions[
+		std::uniform_int_distribution<>(0, mutable_positions.size()-1)(rng)];
+	char random_acgu = "ACGU"[std::uniform_int_distribution<>(0, 3)(rng)];
+
+	sgrna->mutate(random_i, random_acgu);
+
+	// If the picked position is constrained to form a base pair, mutate its 
+	// partner to the corresponding base.  Note that GU pairs are ignored to 
+	// avoid biasing the distribution of nucleotides.
+	auto it = base_pairs.find(random_i);
+	if(it != base_pairs.end()) {
+		map<char,char> table = {{'A','U'},{'G','C'},{'C','G'},{'U','A'}};
+		sgrna->mutate(it->second, table[random_acgu]);
+	}
 }
 
 

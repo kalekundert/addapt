@@ -253,3 +253,30 @@ TEST_CASE("Test the Construct class", "[model]") {
 	REQUIRE(rna.seq() == "ACGUGAAAUUUU");
 	REQUIRE(rna_copy->seq() == "ACGUGAAAACGU");
 }
+
+TEST_CASE("Test the Construct::mutate method", "[model]") {
+	Construct dummy;
+
+	dummy += make_shared<Domain>("a", "AA");
+	dummy += make_shared<Domain>("b", "AA");
+
+	SECTION("positive indices count from the front") {
+		dummy.mutate(0, 'U'); CHECK(dummy.seq() == "UAAA");
+		dummy.mutate(1, 'U'); CHECK(dummy.seq() == "UUAA");
+		dummy.mutate(2, 'U'); CHECK(dummy.seq() == "UUUA");
+		dummy.mutate(3, 'U'); CHECK(dummy.seq() == "UUUU");
+	}
+
+	SECTION("negative indices count from the back") {
+		dummy.mutate(-1, 'U'); CHECK(dummy.seq() == "AAAU");
+		dummy.mutate(-2, 'U'); CHECK(dummy.seq() == "AAUU");
+		dummy.mutate(-3, 'U'); CHECK(dummy.seq() == "AUUU");
+		dummy.mutate(-4, 'U'); CHECK(dummy.seq() == "UUUU");
+	}
+
+	SECTION("out-of-bounds indices throw exceptions") {
+		CHECK_THROWS(dummy.mutate(4, 'U'));
+		CHECK_THROWS(dummy.mutate(-5, 'U'));
+	}
+}
+

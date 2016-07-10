@@ -30,6 +30,7 @@ configure
 libtool
 Makefile
 Makefile.in
+mh
 *.log
 *.trs
 *.tar.gz

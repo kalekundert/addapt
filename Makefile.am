@@ -37,9 +37,13 @@ mh_LDADD = \
 check_PROGRAMS = \
 	run_tests
 
+run_tests_CXXFLAGS = \
+	-g
+
 run_tests_SOURCES = \
 	tests/test_model.cc \
 	tests/test_scoring.cc \
+	tests/test_sampling.cc \
 	tests/main.cc
 
 run_tests_LDADD = \
