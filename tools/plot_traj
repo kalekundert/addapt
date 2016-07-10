@@ -48,6 +48,7 @@ subplot(2, 1, 2, sharex=gca())
 plot_best_scores()
 plot(traj['step'], traj['temperature'], color=tango.blue[2])
 xlabel('step')
+xlim(0, len(traj))
 ylabel('temperature')
 
 # Display the plot.

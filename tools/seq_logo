@@ -10,6 +10,11 @@ Options:
         probably be about the auto-correlation time, to ensure that the picked 
         sequences are independent.
 
+    -i --info
+        Scale the of each stack by the information-content of that position.  
+        By default this is not done, and each the height of each symbol is 
+        proportional to the its probability.
+
     -o --output <path>      [default: logs/mh.pdf]
         The path where the sequence logo should be written.  The file type will 
         be deduced from the extension; valid options are: *.eps *.pdf *.png 
@@ -20,35 +25,34 @@ import sys, docopt, tango, utils
 import numpy as np, pandas as pd
 from pprint import pprint
 
-def make_seqlogo(wt, seqs, path):
-    import weblogolib as weblogo
-    from weblogolib.colorscheme import ColorScheme, RefSeqColor, SymbolColor
-    from pathlib import Path
-
-    # Make the sequence logo.
-    seqs = weblogo.SeqList(seqs, alphabet=weblogo.std_alphabets['rna'])
-    data = weblogo.LogoData.from_seqs(seqs)
-    options = weblogo.LogoOptions()
-    options.logo_title = '{}  (N={})'.format(path, len(seqs))
-    options.show_fineprint = False
-    options.unit_name = 'probability'
-    options.color_scheme = ColorScheme([
-        RefSeqColor(wt, '#dfe0e0'),
-        SymbolColor("GC", '#178ccb'),
-        SymbolColor("AU", '#f48024'),
-    ])
-    format = weblogo.LogoFormat(data, options)
-
-    # Save the sequence logo to a file.
-    # Deduce the file format from the extension of the given path.  
-    path = Path(path)
-    formatter = weblogo.formatters[path.suffix.strip('.')]
-    with path.open('wb') as file:
-        file.write(formatter(data, format))
-
-
 args = docopt.docopt(__doc__)
 picked_seqs = utils.pick_best_seqs(args['<trajectories>'], int(args['--window']))
 initial_seq = utils.load_initial_seq(args['<trajectories>'])
 
-make_seqlogo(initial_seq, [x.seq for x in picked_seqs], args['--output'])
+import weblogolib as weblogo
+from weblogolib.colorscheme import ColorScheme, RefSeqColor, SymbolColor
+from pathlib import Path
+
+# Make the sequence logo.
+seqs = weblogo.SeqList(
+        [x.seq for x in picked_seqs],
+        alphabet=weblogo.std_alphabets['rna'])
+data = weblogo.LogoData.from_seqs(seqs)
+options = weblogo.LogoOptions()
+options.logo_title = '{}  (N={})'.format(args['--output'], len(seqs))
+options.show_fineprint = False
+options.unit_name = 'bits' if args['--info'] else 'probability' 
+options.color_scheme = ColorScheme([
+    RefSeqColor(initial_seq, '#dfe0e0'),
+    SymbolColor("GC", '#178ccb'),
+    SymbolColor("AU", '#f48024'),
+])
+format = weblogo.LogoFormat(data, options)
+
+# Save the sequence logo to a file.
+# Deduce the file format from the extension of the given path.  
+path = Path(args['--output'])
+formatter = weblogo.formatters[path.suffix.strip('.')]
+with path.open('wb') as file:
+    file.write(formatter(data, format))
+
