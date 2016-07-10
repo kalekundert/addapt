@@ -25,21 +25,32 @@ pkginclude_HEADERS = \
 
 # Apps
 bin_PROGRAMS = \
-	mh
+	mh \
+	design_rna
 
 mh_SOURCES = \
 	apps/mh.cc
 
 mh_LDADD = \
 	libsgrna.la
+
+design_rna_SOURCES = \
+	apps/design_rna.cc
+
+design_rna_LDADD = \
+	libsgrna.la
 	
 # Tests
 check_PROGRAMS = \
 	run_tests
 
+run_tests_CXXFLAGS = \
+	-g
+
 run_tests_SOURCES = \
 	tests/test_model.cc \
 	tests/test_scoring.cc \
+	tests/test_sampling.cc \
 	tests/main.cc
 
 run_tests_LDADD = \

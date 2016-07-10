@@ -181,6 +181,19 @@ Construct::active() const {
 	return cst;
 }
 
+void
+Construct::mutate(int index, char mutation) {
+	index = normalize_index(seq(), index, IndexEnum::ITEM);
+	int cursor = 0;
+
+	for(DomainPtr domain : my_domains) {
+		if(index - cursor < domain->len()) {
+			return domain->mutate(index - cursor, mutation);
+		}
+		cursor += domain->len();
+	}
+}
+
 DomainMultiIndex
 Construct::domains() const {
 	return my_domains;

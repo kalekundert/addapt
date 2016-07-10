@@ -163,6 +163,9 @@ public:
 	/// @brief Return constraints that define the active state of this construct.
 	string active() const;
 
+	/// @brief Make a point mutation in this construct.
+	void mutate(int, char);
+
 	/// @brief Return the domains that make up this construct.
 	DomainMultiIndex domains() const;
 

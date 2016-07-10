@@ -3,7 +3,6 @@
 
 AC_PREREQ([2.63])
 AC_INIT([sgrna_monte_carlo], [0.0], [kale.kundert@ucsf.edu])
-AC_PREFIX_DEFAULT([~/.local])
 AC_CONFIG_AUX_DIR([build/aux])
 AC_CONFIG_MACRO_DIR([build/m4])
 AC_CONFIG_FILES([Makefile])
@@ -33,6 +32,10 @@ AX_CXX_CHECK_LIB(
     [docopt], [docopt::value],
     [], [AC_MSG_ERROR([missing the docopt.cpp library])])
 
+AX_CXX_CHECK_LIB(
+    [yaml-cpp], [YAML::Parser],
+    [], [AC_MSG_ERROR([missing the yaml-cpp library])])
+
 # Checks for header files.
 AC_CHECK_HEADERS(
     [ViennaRNA/part_func.h],
@@ -45,6 +48,10 @@ AC_CHECK_HEADERS(
 AC_CHECK_HEADERS(
     [boost/format.hpp boost/algorithm/string.hpp],
     [], [AC_MSG_ERROR([missing the boost headers])])
+
+AC_CHECK_HEADERS(
+    [yaml-cpp/yaml.h],
+    [], [AC_MSG_ERROR([missing the yaml-cpp headers])])
 
 AC_CHECK_HEADERS(
     [algorithm cmath iostream iterator list memory regex string utility vector],

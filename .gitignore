@@ -6,6 +6,7 @@
 *.pdf
 *.eps
 *.svg
+*.yml
 logs/
 
 ## C++
@@ -27,9 +28,11 @@ aclocal.m4
 autom4te.cache
 config.status
 configure
+design_rna
 libtool
 Makefile
 Makefile.in
+mh
 *.log
 *.trs
 *.tar.gz

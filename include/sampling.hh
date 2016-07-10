@@ -263,6 +263,18 @@ public:
 
 };
 
+class AutoPointMutation : public Move {
+
+public:
+
+	AutoPointMutation();
+
+	string name() const { return "AutoPointMutation"; }
+
+	void apply(ConstructPtr, std::mt19937 &) const;
+
+};
+
 class MakeWtReversion : public DomainMove {
 
 public:
