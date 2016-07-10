@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.69])
+AC_PREREQ([2.63])
 AC_INIT([sgrna_monte_carlo], [0.0], [kale.kundert@ucsf.edu])
 AC_PREFIX_DEFAULT([~/.local])
 AC_CONFIG_AUX_DIR([build/aux])
@@ -14,7 +14,6 @@ AM_SILENT_RULES([yes])
 AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_INSTALL
-AM_PROG_AR
 LT_INIT
 
 # Checks for C++11.
