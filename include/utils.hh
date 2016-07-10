@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iterator>
 #include <list>
+#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -19,6 +20,7 @@ using std::string;
 using std::vector;
 using std::list;
 using std::pair;
+using std::map;
 
 /// @brief Do the indices refer to the items in the collection themselves, or 
 /// to the spaces between the items?
@@ -69,6 +71,19 @@ ostream& operator<< (ostream& out, const vector<T>& vec) {
   if ( !vec.empty() ) {
     out << '[';
     copy(vec.begin(), vec.end(), ostream_iterator<T>(out, ", "));
+    out << "\b\b]";
+  }
+  return out;
+}
+
+template <typename K, typename V>
+ostream& operator<< (ostream& out, const map<K,V>& map) {
+  if ( !map.empty() ) {
+    out << '{';
+		for(auto it: map) {
+			out << it.first << ": ";
+			out << it.second << ", ";
+		}
     out << "\b\b]";
   }
   return out;
