@@ -58,7 +58,8 @@ ViennaRnaFold::macrostate_prob(string macrostate) const {
 	double g_tot = vrna_pf(fc, NULL);
 
 	// Add a constraint that defines the "active" macrostate.
-	vrna_constraints_add(fc, macrostate.c_str(), VRNA_CONSTRAINT_DB_DEFAULT);
+	vrna_constraints_add(fc, macrostate.c_str(),
+			VRNA_CONSTRAINT_DB_DEFAULT | VRNA_CONSTRAINT_DB_ENFORCE_BP);
 
 	// Calculate the free energy for the "active" macrostate.
 	double g_active = vrna_pf(fc, NULL);
