@@ -26,7 +26,7 @@ pkginclude_HEADERS = \
 # Apps
 bin_PROGRAMS = \
 	mh \
-	design_rna
+	addapt
 
 mh_SOURCES = \
 	apps/mh.cc
@@ -34,10 +34,10 @@ mh_SOURCES = \
 mh_LDADD = \
 	libsgrna.la
 
-design_rna_SOURCES = \
-	apps/design_rna.cc
+addapt_SOURCES = \
+	apps/addapt.cc
 
-design_rna_LDADD = \
+addapt_LDADD = \
 	libsgrna.la
 	
 # Tests
