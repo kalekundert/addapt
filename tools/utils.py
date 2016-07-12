@@ -39,7 +39,7 @@ def pick_best_scores(scores, window_size):
     BLOCKED = np.min(scores)
     THRESHOLD = np.percentile(scores, 75)
 
-    while scores.max() > THRESHOLD:
+    while scores.max() >= THRESHOLD:
         i = scores.argmax()
         peaks.append(i)
 
