@@ -203,6 +203,31 @@ private:
 };
 
 
+class Aptamer {
+
+public:
+
+	/// @brief Construct with a sequence, fold, and ΔG (kcal/mol).
+	Aptamer(string, string, double);
+
+	/// @brief Return the sequence of this aptamer.
+	string seq() const;
+
+	/// @brief Return a pseudo-dot-bracket string specifying the base pairs 
+	/// formed by this aptamer in the holo condition.
+	string fold() const;
+
+	/// @brief Return the folding free energy (in kcal/mol) of this aptamer.
+	double delta_g() const;
+
+private:
+
+	string my_seq;
+	string my_fold;
+	double my_delta_g;
+
+};
+
 std::ostream &operator<<(std::ostream &, Construct const &);
 std::ostream &operator<<(std::ostream &, Domain const &);
 

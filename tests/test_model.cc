@@ -280,3 +280,15 @@ TEST_CASE("Test the Construct::mutate method", "[model]") {
 	}
 }
 
+TEST_CASE("Test the Aptamer class", "[model]") {
+	Aptamer theo(
+			"GAUACCAGCCGAAAGGCCCUUGGCAGC",
+			"(...((.(((....)))....))...)",
+			-9.22);
+
+	CHECK(theo.seq() == "GAUACCAGCCGAAAGGCCCUUGGCAGC");
+	CHECK(theo.fold() == "(...((.(((....)))....))...)");
+	CHECK(theo.delta_g() == -9.22);
+}
+
+

@@ -11,6 +11,135 @@ Sequence::len() const {
 }
 
 
+Construct::Construct() {}
+
+ConstructPtr
+Construct::copy() const {
+	// Make a new construct.
+	ConstructPtr construct = std::make_shared<Construct>();
+
+	// Fill it with copies of my domains.
+	for(DomainPtr domain: my_domains) {
+		*construct += domain->copy();
+	}
+
+	// Return the new construct.
+	return construct;
+}
+
+string
+Construct::seq() const {
+	string seq;
+
+	for(DomainPtr domain: my_domains) {
+		seq += domain->seq();
+	}
+
+	return seq;
+}
+
+string
+Construct::active() const {
+	string cst;
+
+	for(DomainPtr domain: my_domains) {
+		cst += domain->active();
+	}
+
+	return cst;
+}
+
+void
+Construct::mutate(int index, char mutation) {
+	index = normalize_index(seq(), index, IndexEnum::ITEM);
+	int cursor = 0;
+
+	for(DomainPtr domain : my_domains) {
+		if(index - cursor < domain->len()) {
+			return domain->mutate(index - cursor, mutation);
+		}
+		cursor += domain->len();
+	}
+}
+
+DomainMultiIndex
+Construct::domains() const {
+	return my_domains;
+}
+
+DomainPtr
+Construct::domain(string name) const {
+	auto it = my_domains.get<hash>().find(name);
+	if (it == my_domains.get<hash>().end()) {
+		throw (f("no such domain '%s'") % name).str();
+	}
+	return *it;
+}
+
+DomainPtr
+Construct::operator[](string name) const {
+	return domain(name);
+}
+
+DomainPtr
+Construct::operator[](DomainConstPtr domain) const {
+	return this->domain(domain->name());
+}
+
+void
+Construct::add_domain(DomainPtr domain) {
+	my_domains.push_back(domain);
+}
+
+void
+Construct::operator+=(DomainPtr domain) {
+	add_domain(domain);
+}
+
+int
+Construct::index(Nucleotide nuc) const {
+	int index = 0;
+
+	for(DomainConstPtr domain : my_domains) {
+		if (nuc.domain == domain->name()) {
+			return index + nuc.offset;
+		}
+		index += domain->len();
+	}
+
+	throw (f("No nucleotide named %s") % nuc.domain).str();
+}
+
+int
+Construct::index_5(string name) const {
+	int index = 0;
+
+	for(DomainConstPtr domain : my_domains) {
+		if (name == domain->name()) {
+			return index;
+		}
+		index += domain->len();
+	}
+
+	throw (f("No domain named %s") % name).str();
+}
+
+int
+Construct::index_5(DomainConstPtr domain) const {
+	return index_5(domain->name());
+}
+
+int
+Construct::index_3(string name) const {
+	return index_3(domain(name));
+}
+
+int
+Construct::index_3(DomainConstPtr domain) const {
+	return index_5(domain) + domain->len() - 1;
+}
+
+
 Domain::Domain(
 		string const name,
 		ColorEnum color,
@@ -143,132 +272,22 @@ Domain::style(StyleEnum style) {
 }
 
 
-Construct::Construct() {}
+Aptamer::Aptamer(string seq, string fold, double delta_g):
+	my_seq(seq), my_fold(fold), my_delta_g(delta_g) {}
 
-ConstructPtr
-Construct::copy() const {
-	// Make a new construct.
-	ConstructPtr construct = std::make_shared<Construct>();
-
-	// Fill it with copies of my domains.
-	for(DomainPtr domain: my_domains) {
-		*construct += domain->copy();
-	}
-
-	// Return the new construct.
-	return construct;
+string
+Aptamer::seq() const {
+	return my_seq;
 }
 
 string
-Construct::seq() const {
-	string seq;
-
-	for(DomainPtr domain: my_domains) {
-		seq += domain->seq();
-	}
-
-	return seq;
+Aptamer::fold() const {
+	return my_fold;
 }
 
-string
-Construct::active() const {
-	string cst;
-
-	for(DomainPtr domain: my_domains) {
-		cst += domain->active();
-	}
-
-	return cst;
-}
-
-void
-Construct::mutate(int index, char mutation) {
-	index = normalize_index(seq(), index, IndexEnum::ITEM);
-	int cursor = 0;
-
-	for(DomainPtr domain : my_domains) {
-		if(index - cursor < domain->len()) {
-			return domain->mutate(index - cursor, mutation);
-		}
-		cursor += domain->len();
-	}
-}
-
-DomainMultiIndex
-Construct::domains() const {
-	return my_domains;
-}
-
-DomainPtr
-Construct::domain(string name) const {
-	auto it = my_domains.get<hash>().find(name);
-	if (it == my_domains.get<hash>().end()) {
-		throw (f("no such domain '%s'") % name).str();
-	}
-	return *it;
-}
-
-DomainPtr
-Construct::operator[](string name) const {
-	return domain(name);
-}
-
-DomainPtr
-Construct::operator[](DomainConstPtr domain) const {
-	return this->domain(domain->name());
-}
-
-void
-Construct::add_domain(DomainPtr domain) {
-	my_domains.push_back(domain);
-}
-
-void
-Construct::operator+=(DomainPtr domain) {
-	add_domain(domain);
-}
-
-int
-Construct::index(Nucleotide nuc) const {
-	int index = 0;
-
-	for(DomainConstPtr domain : my_domains) {
-		if (nuc.domain == domain->name()) {
-			return index + nuc.offset;
-		}
-		index += domain->len();
-	}
-
-	throw (f("No nucleotide named %s") % nuc.domain).str();
-}
-
-int
-Construct::index_5(string name) const {
-	int index = 0;
-
-	for(DomainConstPtr domain : my_domains) {
-		if (name == domain->name()) {
-			return index;
-		}
-		index += domain->len();
-	}
-
-	throw (f("No domain named %s") % name).str();
-}
-
-int
-Construct::index_5(DomainConstPtr domain) const {
-	return index_5(domain->name());
-}
-
-int
-Construct::index_3(string name) const {
-	return index_3(domain(name));
-}
-
-int
-Construct::index_3(DomainConstPtr domain) const {
-	return index_5(domain) + domain->len() - 1;
+double
+Aptamer::delta_g() const {
+	return my_delta_g;
 }
 
 
