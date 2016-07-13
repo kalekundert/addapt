@@ -1,4 +1,5 @@
-/run_tests
+.env
+.unenv
 
 ## Data
 *.ps

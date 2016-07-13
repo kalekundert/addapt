@@ -6,13 +6,14 @@
 #include <docopt/docopt.h>
 #include <yaml-cpp/yaml.h>
 
+#include "config.hh"
 #include "model.hh"
 #include "sampling.hh"
 #include "scoring.hh"
 #include "utils.hh"
 
 using namespace std;
-using namespace sgrna_design;
+using namespace addapt;
 
 static char const USAGE[] = R"""(
 Insert the theophylline aptamer into the first hairpin of the sgRNA and run a 
@@ -21,7 +22,7 @@ ruler, and the rest of the first hairpin.  The design goal is to only form the
 wildtype nexus and hairpin base pairs when theophylline is bound.
 
 Usage:
-  design_rna <seq> [options]
+  addapt <config>... [options]
 
 Options:
   -n --num-moves <num>           [default: 100]
@@ -48,7 +49,7 @@ Options:
     How often a new snapshot in the trajectory should be recorded.
     
   -v --version
-    Display the version of ``design_rna`` being used.
+    Display the version of ``addapt`` being used.
     
   -h --help
     Display this usage information.
@@ -58,44 +59,45 @@ int main(int argc, char **argv) {
 	try {
 		map<string, docopt::value> args = docopt::docopt(
 				USAGE+1, {argv + 1, argv + argc}, true, "0.0");
-		YAML::Node config = YAML::LoadFile(args["<seq>"].asString());
-
+		vector<string> config_files = args["<config>"].asStringList();
+		
 		// Create the construct.
-		ConstructPtr rna = make_shared<Construct>();
-		*rna += make_shared<Domain>(
-				"", config["seq"].as<string>(), config["cst"].as<string>());
+		ConstructPtr construct = construct_from_yaml(config_files);
 
 		// Create the score function.
-		ScoreFunctionPtr scorefxn = make_shared<ScoreFunction>();
-		*scorefxn += make_shared<ActiveMacrostateTerm>();
+		ScoreFunctionPtr scorefxn = scorefxn_from_yaml(config_files);
 
 		// Create the Monte Carlo sampler.
 		MonteCarloPtr sampler = make_shared<MonteCarlo>();
-		*sampler += make_shared<AutoPointMutation>();
+		*sampler += make_shared<UnbiasedMutationMove>();
 
-		ThermostatPtr thermostat = build_thermostat(
-				args["--temperature"].asString());
+		ThermostatPtr thermostat = args["--temperature"]? 
+			thermostat_from_str(args["--temperature"].asString()) :
+			thermostat_from_yaml(config_files);
+
 		ReporterPtr progress_bar = make_shared<ProgressReporter>();
 		ReporterPtr traj_reporter = make_shared<TsvTrajectoryReporter>(
 				args["--output"].asString(),
 				stoi(args["--output-interval"].asString()));
 
 		sampler->num_steps(stoi(args["--num-moves"].asString()));
-		sampler->thermostat(thermostat);
 		sampler->scorefxn(scorefxn);
+		sampler->thermostat(thermostat);
 		sampler->add_reporter(progress_bar);
 		sampler->add_reporter(traj_reporter);
 
 		std::mt19937 rng(stoi(args["--random-seed"].asString()));
 
 		// Run the design simulation.
-		sampler->apply(rna, rng);
-
+		sampler->apply(construct, rng);
 		return 0;
+	}
+	catch(YAML::Exception exc) {
+		cerr << "YAML Error: " << exc.msg << endl;
+		return 1;
 	}
 	catch(string error_message) {
 		cerr << "Error: " << error_message << endl;
+		return 1;
 	}
 }
-
-

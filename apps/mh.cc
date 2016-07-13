@@ -16,7 +16,7 @@ extern "C" {
 #include "utils.hh"
 
 using namespace std;
-using namespace sgrna_design;
+using namespace addapt;
 
 static char const USAGE[] = R"""(
 Insert the theophylline aptamer into the first hairpin of the sgRNA and run a 

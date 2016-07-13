@@ -10,7 +10,7 @@
 #include "scoring.hh"
 #include "utils.hh"
 
-namespace sgrna_design {
+namespace addapt {
 
 class MonteCarlo;
 using MonteCarloPtr = std::shared_ptr<MonteCarlo>;
@@ -94,13 +94,52 @@ enum class OutcomeEnum {
 
 struct MonteCarloStep {
 	int i, num_steps;
-	ConstructPtr current_sgrna, proposed_sgrna;
+	ConstructPtr current_construct, proposed_construct;
 	MovePtr move;
 	EvaluatedScoreFunction score_table;
 	double current_score, proposed_score, score_diff;
 	double temperature, metropolis_criterion, random_threshold;
 	OutcomeEnum outcome;
 	std::map<OutcomeEnum,int> outcome_counters;
+};
+
+
+map<char, char> const COMPLEMENTARY_NUCS = {
+	{'A','U'},{'G','C'},{'C','G'},{'U','A'}};
+
+bool
+can_be_mutated(ConstructConstPtr, int);
+
+bool
+can_be_freely_mutated(ConstructConstPtr, int);
+
+void
+mutate_recursively(ConstructPtr, int const, char const);
+
+void
+mutate_recursively(ConstructPtr, int const, char const, vector<bool> &);
+
+
+class Move {
+
+public:
+
+	virtual string name() const = 0;
+
+	virtual void apply(ConstructPtr, std::mt19937 &) const = 0;
+
+};
+
+class UnbiasedMutationMove : public Move {
+
+public:
+
+	UnbiasedMutationMove();
+
+	string name() const { return "UnbiasedMutation"; }
+
+	void apply(ConstructPtr, std::mt19937 &) const;
+
 };
 
 
@@ -181,9 +220,6 @@ private:
 
 };
 
-ThermostatPtr
-build_thermostat(string spec);
-
 
 class Reporter {
 
@@ -223,95 +259,12 @@ private:
 };
 
 
-class Move {
-
-public:
-
-	virtual string name() const = 0;
-
-	virtual void apply(ConstructPtr, std::mt19937 &) const = 0;
-
-};
-
-class DomainMove : public Move {
-
-public:
-
-	DomainMove(std::vector<string>);
-
-	std::vector<string> domain_names() const;
-
-protected:
-
-	string random_domain_name(std::mt19937 &) const;
-
-private:
-
-	std::vector<string> my_domain_names;
-
-};
-
-class MakePointMutation : public DomainMove {
-
-public:
-
-	MakePointMutation(std::vector<string>);
-
-	string name() const { return "MakePointMutation"; }
-
-	void apply(ConstructPtr, std::mt19937 &) const;
-
-};
-
-class AutoPointMutation : public Move {
-
-public:
-
-	AutoPointMutation();
-
-	string name() const { return "AutoPointMutation"; }
-
-	void apply(ConstructPtr, std::mt19937 &) const;
-
-};
-
-class MakeWtReversion : public DomainMove {
-
-public:
-
-	MakeWtReversion(std::vector<string>, ConstructConstPtr);
-
-	string name() const { return "MakeWtReversion"; }
-
-	void apply(ConstructPtr, std::mt19937 &) const;
-
-private:
-
-	ConstructConstPtr my_wt;
-};
-
-class ChangeDomainLength : public Move {
-
-public:
-
-	ChangeDomainLength(string, int, int);
-
-	string name() const { return "ChangeDomainLength"; }
-
-	void apply(ConstructPtr, std::mt19937 &) const;
-
-private:
-
-	string my_domain_name;
-	int my_max_len, my_min_len;
-};
-
 }
 
 namespace std {
 
 ostream&
-operator<<(ostream&, const sgrna_design::OutcomeEnum&);
+operator<<(ostream&, const addapt::OutcomeEnum&);
 
 }
 

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <cmath>
 #include <iostream>
@@ -9,7 +10,7 @@
 
 using namespace std;
 
-namespace sgrna_design {
+namespace addapt {
 
 MonteCarlo::MonteCarlo(): 
 	my_steps(0),
@@ -19,9 +20,9 @@ MonteCarlo::MonteCarlo():
 	my_reporters() {}
 
 ConstructPtr
-MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
+MonteCarlo::apply(ConstructPtr construct, std::mt19937 &rng) const {
 	if (my_moves.empty()) {
-		return sgrna;
+		return construct;
 	}
 
 	// Setup to data structure that will hold all the information about each 
@@ -29,14 +30,14 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 	// methods and thermostats.
 	MonteCarloStep step;
 	step.num_steps = my_steps; step.i = -1;
-	step.current_sgrna = sgrna;
+	step.current_construct = construct;
 
 	// Create random number distributions for later use.
 	auto random = std::bind(std::uniform_real_distribution<>(), rng);
 	auto randmove = std::bind(std::uniform_int_distribution<>(0, my_moves.size()-1), rng);
 
 	// Get an initial score.
-	step.current_score = my_scorefxn->evaluate(step.current_sgrna, step.score_table);
+	step.current_score = my_scorefxn->evaluate(step.current_construct, step.score_table);
 	step.proposed_score = step.current_score;
 
 	// Initialize the counters that will keep track of how often moves are 
@@ -58,20 +59,20 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 		step.temperature = my_thermostat->adjust(step);
 
 		// Copy the sgRNA so we can easily undo the move.
-		step.proposed_sgrna = step.current_sgrna->copy();
+		step.proposed_construct = step.current_construct->copy();
 
 		// Randomly pick a move to apply.
 		step.move = my_moves[randmove()];
-		step.move->apply(step.proposed_sgrna, rng);
+		step.move->apply(step.proposed_construct, rng);
 
 		// Skip the score function evaluation if the sequence didn't change.
-		if(step.current_sgrna->seq() == step.proposed_sgrna->seq()) {
+		if(step.current_construct->seq() == step.proposed_construct->seq()) {
 			step.outcome = OutcomeEnum::ACCEPT_UNCHANGED;
 		}
 
 		// Score the proposed move, then either accept or reject it.
 		else {
-			step.proposed_score = my_scorefxn->evaluate(step.proposed_sgrna, step.score_table);
+			step.proposed_score = my_scorefxn->evaluate(step.proposed_construct, step.score_table);
 			step.score_diff = step.proposed_score - step.current_score;
 			step.metropolis_criterion = std::exp(step.score_diff / step.temperature);
 			step.random_threshold = random();
@@ -83,7 +84,7 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 				step.outcome = (step.score_diff > 0)?
 					OutcomeEnum::ACCEPT_IMPROVED : OutcomeEnum::ACCEPT_WORSENED;
 
-				step.current_sgrna = step.proposed_sgrna;
+				step.current_construct = step.proposed_construct;
 				step.current_score = step.proposed_score;
 			}
 		}
@@ -102,7 +103,7 @@ MonteCarlo::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
 		reporter->finish(step);
 	}
 
-	return step.current_sgrna;
+	return step.current_construct;
 }
 
 int
@@ -166,63 +167,140 @@ MonteCarlo::operator+=(ReporterPtr reporter) {
 }
 
 
-ThermostatPtr
-build_thermostat(string spec) {
-	std::regex fixed_pattern(
-			"([0-9.e+-]+)" 	    // A floating-point number (the temperature).
-	);
-	std::regex annealing_pattern(
-			"(?:"               // Optional argument.
-			"([0-9]+)"          // An integer (the number of steps per cycle).
-			"\\s+"
-			")?"
-			"([0-9.e+-]+)"      // A floating point number (the high temperature).
-			"\\s*"
-			"=>"                // An arrow.
-			"\\s*"
-			"([0-9.e+-]+)"      // A floating point number (the low temperature).
-	);
-	std::regex auto_scaling_pattern(
-			"auto"
-			"(?:"						    // Optional argument.
-			"\\s+"
-			"([0-9.]+)%"        // A percentage (the target acceptance rate).
-				"(?:"         
-				"\\s+"
-				"([0-9]+)"        // An integer (the training period).
-					"(?:"
-					"\\s+"
-					"([0-9.e+-]+)"  // A floating point number (the initial temperature).
-					")?"
-				")?"
-			")?"
-	);
-
-	std::smatch match;
-
-	if(std::regex_match(spec, match, fixed_pattern)) {
-		double temperature = stod(match[1]);
-		return make_shared<FixedThermostat>(temperature);
-	}
-
-	if(std::regex_match(spec, match, annealing_pattern)) {
-		int cycle_len = stoi(match[1].length()? match[1].str() : "1");
-		double high_temp = stod(match[2]);
-		double low_temp = stod(match[3]);
-		return make_shared<AnnealingThermostat>(cycle_len, high_temp, low_temp);
-	}
-
-	if(std::regex_match(spec, match, auto_scaling_pattern)) {
-		double accept_rate = stod(match[1].length()? match[1].str() : "50") / 100;
-		int training_period = stod(match[2].length()? match[2].str() : "100");
-		double initial_temp = stod(match[3].length()? match[3].str() : "1");
-		return make_shared<AutoScalingThermostat>(
-				accept_rate, training_period, initial_temp);
-	}
-
-	throw (f("can't make a thermostat from '%s'") % spec).str();
+bool
+can_be_mutated(ConstructConstPtr construct, int position) {
+	// Only mutate positions that are upper case.  This is a simple way for the 
+	// user to indicate which positions should be mutable.
+	return isupper(construct->seq()[position]);
 }
 
+bool
+can_be_freely_mutated(ConstructConstPtr construct, int position) {
+	if(not can_be_mutated(construct, position)) {
+			return false;
+	}
+
+	// Don't mutate positions that are constrained to be the 3' end of a base 
+	// pair.  We don't want to over-sample these positions, and they'll be 
+	// mutated as a unit with their partner.
+	for(auto /*pair*/ macrostate: construct->macrostates()) {
+		if(macrostate.second[position] == ')') {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void
+mutate_recursively(
+		ConstructPtr construct,
+		int const position,
+		char const mutation) {
+
+	vector<bool> already_mutated(construct->len(), false);
+	mutate_recursively(construct, position, mutation, already_mutated);
+}
+
+void
+mutate_recursively(
+		ConstructPtr construct,
+		int const position,
+		char const mutation,
+		vector<bool> &already_mutated) {
+
+	assert(already_mutated.size() == construct->len());
+	assert(not already_mutated[position]);
+	assert(can_be_mutated(construct, position));
+
+	// Make the indicated mutation to the construct.
+	construct->mutate(position, mutation);
+	already_mutated[position] = true;
+
+	// Recursively make complementary mutations in any position constrained to be 
+	// base paired to this one.  GU base pairs are not considered because they 
+	// would necessarily cause a bias in the final nucleotide distribution.
+	for(auto item: construct->macrostates()) {
+		string macrostate = item.second;
+		char open_symbol, close_symbol;
+		int step;
+
+		// If this position is base-paired in this macrostate, setup the variables 
+		// that will be used to search either forward or backward for its partner.
+		if(macrostate[position] == '(') {
+			open_symbol = '(';
+			close_symbol = ')';
+			step = 1;
+		}
+
+		else if(macrostate[position] == ')') {
+			open_symbol = ')';
+			close_symbol = '(';
+			step = -1;
+		}
+
+		// Otherwise, if this position is not base-paired in this macrostate, move 
+		// on to the next macrostate without doing anything.
+		else {
+			continue;
+		}
+
+		// Find the partner that this position is base-paired with in this 
+		// macrostate.
+		int level = 1;
+		int partner = position;
+		
+		while(level != 0) {
+			partner += step;
+			if(partner < 0 or partner >= macrostate.length()) {
+				throw (f("mismatched base-pair in '%s' macrostate: '%s'") % item.first % macrostate).str();
+			}
+
+			level += (macrostate[partner] == open_symbol);
+			level -= (macrostate[partner] == close_symbol);
+		}
+
+		// Make sure the partner is mutable.
+		if(not can_be_mutated(construct, partner)) {
+			throw (f("position '%d' can be mutated, but it's base-paired to position '%d' which can't be.") % position % partner).str();
+		}
+
+		// Recursively mutate the partner such that every base-pairing constraint 
+		// in every macrostate can be satisfied.
+		char complementary_mutation = COMPLEMENTARY_NUCS.at(mutation);
+		if(not already_mutated[partner]) {
+			mutate_recursively(
+					construct, partner, complementary_mutation, already_mutated);
+		}
+		else if(construct->seq()[partner] != complementary_mutation) {
+			// I can't think of a way to trigger this condition (programming errors 
+			// excluded), but I'm not yet convinced that there isn't a way.  If I 
+			// were, I would've made this an assertion rather than an exception.
+			throw "no way to satisfy all base pairing constraints.";
+		}
+	}
+}
+
+
+UnbiasedMutationMove::UnbiasedMutationMove() {}
+
+void
+UnbiasedMutationMove::apply(ConstructPtr construct, std::mt19937 &rng) const {
+	// Make a list of the positions that can be mutated.
+	vector<int> mutable_positions;
+	for(int i = 0; i < construct->len(); i++) {
+		if(can_be_freely_mutated(construct, i)) {
+			mutable_positions.push_back(i);
+		}
+	}
+
+	// Mutate a randomly chosen position to a randomly chosen base.
+	int random_i = mutable_positions[
+		std::uniform_int_distribution<>(0, mutable_positions.size()-1)(rng)];
+	char random_acgu = "ACGU"[std::uniform_int_distribution<>(0, 3)(rng)];
+
+	mutate_recursively(construct, random_i, random_acgu);
+}
 
 FixedThermostat::FixedThermostat(double temperature):
 	my_temperature(temperature) {}
@@ -358,11 +436,10 @@ TsvTrajectoryReporter::start(MonteCarloStep const & step) {
 
 	// Record parameters that apply to the whole trajectory.  All the lines in 
 	// this section are prefixed with '#' so they won't be parsed by pandas as 
-	// part of the trajectory.
+	// part of the trajectory.  This is a hack.  It'd be better to use HDF5.
+	my_tsv << "#\t" << "initial_seq\t" << step.current_construct->seq() << "\n";
 
-	my_tsv << "#\t" << "initial_seq\t" << step.current_sgrna->seq() << "\n";
-
-	// Write the column 
+	// Write the column headers.
 	my_tsv << "step\t";
 	my_tsv << "num_steps\t";
 	my_tsv << "current_score\t";
@@ -379,13 +456,8 @@ TsvTrajectoryReporter::start(MonteCarloStep const & step) {
 	my_tsv << "random_threshold\t";
 	my_tsv << "move\t";
 	my_tsv << "outcome\t";
-
-	for(auto domain: step.current_sgrna->domains()) {
-		my_tsv << f("current_domain[%s]") % domain->name() << "\t";
-	}
-	for(auto domain: step.current_sgrna->domains()) {
-		my_tsv << f("proposed_domain[%s]") % domain->name() << "\t";
-	}
+	my_tsv << "current_seq\t";
+	my_tsv << "proposed_seq\t";
 	
 	my_tsv << std::endl;
 }
@@ -409,13 +481,8 @@ TsvTrajectoryReporter::update(MonteCarloStep const &step) {
 		my_tsv << step.random_threshold << "\t";
 		my_tsv << step.move->name() << "\t";
 		my_tsv << step.outcome << "\t";
-
-		for(auto domain: step.current_sgrna->domains()) {
-			my_tsv << domain->seq() << "\t";
-		}
-		for(auto domain: step.proposed_sgrna->domains()) {
-			my_tsv << domain->seq() << "\t";
-		}
+		my_tsv << step.current_construct->seq() << "\t";
+		my_tsv << step.proposed_construct->seq() << "\t";
 
 		my_tsv << std::endl;
 	}
@@ -427,161 +494,17 @@ TsvTrajectoryReporter::finish(MonteCarloStep const &step) {
 }
 
 
-DomainMove::DomainMove(std::vector<string> domain_names):
-	my_domain_names(domain_names) {}
-
-std::vector<string>
-DomainMove::domain_names() const {
-	return my_domain_names;
-}
-
-string
-DomainMove::random_domain_name(std::mt19937 &rng) const {
-	auto dist = std::uniform_int_distribution<>(0, my_domain_names.size()-1);
-	return my_domain_names[dist(rng)];
-}
-
-
-MakePointMutation::MakePointMutation(std::vector<string> domain_names):
-	DomainMove(domain_names) {}
-
-void
-MakePointMutation::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
-	DomainPtr random_domain = (*sgrna)[random_domain_name(rng)];
-	int random_i = std::uniform_int_distribution<>(0, random_domain->len()-1)(rng);
-	char random_acgu = "ACGU"[std::uniform_int_distribution<>(0, 3)(rng)];
-	random_domain->mutate(random_i, random_acgu);
-}
-
-
-AutoPointMutation::AutoPointMutation() {}
-
-void
-AutoPointMutation::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
-	vector<int> mutable_positions;
-	map<int,int> base_pairs;
-	string seq = sgrna->seq();
-	string cst = sgrna->active();
-
-	// Decide which positions will be mutated.
-	for(int i = 0; i < seq.length(); i++) {
-
-		// Only mutate positions that are upper case.  This is a simple way for the 
-		// user to indicate which positions should be mutable.
-		if(islower(seq[i])) { continue; }
-
-		// Fill in a list of positions that can be mutated freely.  This includes 
-		// everything except positions that are constrained to be the 3' end of a 
-		// base pairs.
-		if(cst[i] != ')') {
-			mutable_positions.push_back(i);
-		}
-
-		// Fill in a map relating the 5' and 3' ends of any mutable base pairs.  
-		// The 3' end will not be mutated on its own, but it will be updated when 
-		// the 5' end is mutated.
-		else {
-
-			// Backtrack to find the 5' side of the base pair.
-			int j = i, bp = 1;
-			while(bp != 0) {
-				j -= 1;
-				bp += (cst[j] == ')');
-				bp -= (cst[j] == '(');
-			}
-
-			// Make sure that the 5' side is mutable.
-			if(not contains(mutable_positions, j)) {
-				throw (f("position '%d' can be mutated, but it's base-paired to position '%d' which can't be.") % i % j).str();
-			}
-
-			// Add an entry to the ``base_pairs`` map.
-			base_pairs.insert({j, i});
-		}
-	}
-
-	// Mutate a randomly chosen position to a randomly chosen base.
-	int random_i = mutable_positions[
-		std::uniform_int_distribution<>(0, mutable_positions.size()-1)(rng)];
-	char random_acgu = "ACGU"[std::uniform_int_distribution<>(0, 3)(rng)];
-
-	sgrna->mutate(random_i, random_acgu);
-
-	// If the picked position is constrained to form a base pair, mutate its 
-	// partner to the corresponding base.  Note that GU pairs are ignored to 
-	// avoid biasing the distribution of nucleotides.
-	auto it = base_pairs.find(random_i);
-	if(it != base_pairs.end()) {
-		map<char,char> table = {{'A','U'},{'G','C'},{'C','G'},{'U','A'}};
-		sgrna->mutate(it->second, table[random_acgu]);
-	}
-}
-
-
-MakeWtReversion::MakeWtReversion(
-		std::vector<string> domain_names,
-		ConstructConstPtr wt):
-
-	DomainMove(domain_names),
-  my_wt(wt) {}
-
-void
-MakeWtReversion::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
-	DomainPtr random_domain = (*sgrna)[random_domain_name(rng)];
-	int random_i = std::uniform_int_distribution<>(0, random_domain->len()-1)(rng);
-	char wt_acgu = (*my_wt)[random_domain]->seq(random_i);
-	random_domain->mutate(random_i, wt_acgu);
-}
-
-
-ChangeDomainLength::ChangeDomainLength(
-		string domain_name, int min_length, int max_length):
-
-	my_domain_name(domain_name),
-	my_max_len(max_length),
-	my_min_len(min_length) {}
-
-
-void
-ChangeDomainLength::apply(ConstructPtr sgrna, std::mt19937 &rng) const {
-	DomainPtr domain = (*sgrna)[my_domain_name];
-
-	// Either try to increment or decrement the length of the domain by one, 
-	// being careful to keep the length of domain within the prescribed limits.  
-	// Note that the rest of the function is written generally enough to 
-	// accommodate any algorithm for picking random lengths.
-
-	int random_length = std::min(std::max(
-			domain->len() + (std::bernoulli_distribution()(rng) ? 1 : -1),
-			my_min_len), my_max_len);
-
-	// Insert or remove nucleotides as necessary to bring the domain to the 
-	// randomly chosen length.
-
-	while(domain->len() < random_length) {
-		int random_i = std::uniform_int_distribution<>(0, domain->len()-1)(rng);
-		char random_acgu = "ACGU"[std::uniform_int_distribution<>(0, 3)(rng)];
-		domain->insert(random_i, random_acgu);
-	}
-
-	while(domain->len() > random_length) {
-		int random_i = std::uniform_int_distribution<>(0, domain->len()-1)(rng);
-		domain->remove(random_i);
-	}
-}
-
-
 }
 
 namespace std {
 
 ostream &
-operator<<(ostream& out, const sgrna_design::OutcomeEnum& condition) {
+operator<<(ostream& out, const addapt::OutcomeEnum& condition) {
 	switch(condition) {
-		case sgrna_design::OutcomeEnum::REJECT: out << "REJECT"; break;
-		case sgrna_design::OutcomeEnum::ACCEPT_WORSENED: out << "ACCEPT_WORSENED"; break;
-		case sgrna_design::OutcomeEnum::ACCEPT_UNCHANGED: out << "ACCEPT_UNCHANGED"; break;
-		case sgrna_design::OutcomeEnum::ACCEPT_IMPROVED: out << "ACCEPT_IMPROVED"; break;
+		case addapt::OutcomeEnum::REJECT: out << "REJECT"; break;
+		case addapt::OutcomeEnum::ACCEPT_WORSENED: out << "ACCEPT_WORSENED"; break;
+		case addapt::OutcomeEnum::ACCEPT_UNCHANGED: out << "ACCEPT_UNCHANGED"; break;
+		case addapt::OutcomeEnum::ACCEPT_IMPROVED: out << "ACCEPT_IMPROVED"; break;
 	}
 	return out;
 }

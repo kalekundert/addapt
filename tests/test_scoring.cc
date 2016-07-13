@@ -6,14 +6,14 @@
 #include "utils.hh"
 
 using namespace std;
-using namespace sgrna_design;
+using namespace addapt;
 using bp = pair<int,int>;
 
 class DummyRnaFold : public RnaFold {
 
 public:
 
-	DummyRnaFold(): dg(0) {}
+	DummyRnaFold(double p=0): my_macrostate_prob(p) {}
 
 	double &
 	operator[](bp key) {
@@ -25,48 +25,42 @@ public:
 
 	double
 	base_pair_prob(int a, int b) const {
-		bp key = {std::min(a,b), std::max(a,b)};
+		bp key = {std::min(a,b), std::max(a,b)}; // order doesn't matter
 		auto it = my_base_pair_probs.find(key);
 		return (it != my_base_pair_probs.end())? it->second : 0.0;
 	}
 
 	double
 	macrostate_prob(string) const {
-		return dg;
+		return my_macrostate_prob;
 	}
 
-public:
-	double dg;
-
 private:
+
 	map<bp,double> my_base_pair_probs;
+	double my_macrostate_prob;
 
 };
 
 ConstructConstPtr
 build_rhf_6_construct() {
-	ConstructPtr rhf_6 = make_shared<Construct>();
-
 	// 0....,....1....,....2....,....3....,....4....,....5....,....6....,....7....,....8....,....9....,....0.
 	// GUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCCUUUUCGCCGAUACCAGCCGAAAGGCCCUUGGCAGCGACGGCACCGAGUCGGUGCUUUUUU
 	// (((((((.((((....))))...))))))).,,({{,{..|||{{(,((,{....,.||{}}}})),..,}))).,,||.(((((((...)))))))..... [ΔG=-29.58 kcal/mol, apo]
 	// (((((((.((((....))))...))))))){(((......)))}..{{.((...((.(((....)))....))...)).}|((((((...)))))),..... [ΔG=-33.82 kcal/mol, holo]
 
-	*rhf_6 += make_shared<Domain>("lower_stem/a", "guuuua", "(.....");
-	*rhf_6 += make_shared<Domain>("upper_stem", "gagcuagaaauagcaagu");
-	*rhf_6 += make_shared<Domain>("lower_stem/b", "uaaaau", ".....)");
-	*rhf_6 += make_shared<Domain>("nexus/x", "aagg", "xx..");
-	*rhf_6 += make_shared<Domain>("nexus/y", "cuagu", "xxxxx");
-	*rhf_6 += make_shared<Domain>("nexus/z", "ccCuU", "..xxx");
-	*rhf_6 += make_shared<Domain>("ruler", "UUC", "xxx");
-	*rhf_6 += make_shared<Domain>("hairpin/u", "GCC", "(..");
-	*rhf_6 += make_shared<Domain>("aptamer", "gauaccagccgaaaggcccuuggcagc");
-	*rhf_6 += make_shared<Domain>("hairpin/v", "GAC", "..)");
-	*rhf_6 += make_shared<Domain>("tail", "ggcaccgagucggugcuuuuuu", ".(.............)......");
+	string seq = "guuuuagagcuagaaauagcaaguuaaaauaaggcuaguccCuUUUCGCCgauaccagccgaaaggcccuuggcagcGACggcaccgagucggugcuuuuuu";
+	string cst = "(............................)xx..xxxxx..xxxxxx(...............................).(.............)......";
 
+	ConstructPtr rhf_6 = make_shared<Construct>(seq);
+	rhf_6->add_macrostate("active", cst);
 	return rhf_6;
 }
 
+AptamerConstPtr THEO_APTAMER = make_shared<Aptamer>(
+  "GAUACCAGCCGAAAGGCCCUUGGCAGC",
+  "(...((.(((....)))....))...)",
+  0.32);
 
 TEST_CASE("Test the DummyRnaFold helper class") {
 	DummyRnaFold fold;
@@ -91,10 +85,7 @@ TEST_CASE("Test folding a hairpin without an aptamer", "[scoring]") {
 	// ACGUGAAAACGU
 	// ((((....)))) [ΔG=-2.20 kcal/mol]
 
-	ConstructPtr hairpin = make_shared<Construct>();
-	*hairpin += make_shared<Domain>("stem/a", "ACGU", "(...");
-	*hairpin += make_shared<Domain>("loop", "GAAA", "....");
-	*hairpin += make_shared<Domain>("stem/b", "ACGU", "...)");
+	ConstructPtr hairpin = make_shared<Construct>("ACGUGAAAACGU");
 
 	// Indicate which base pairs I expect to find.
 	set<bp> expected_base_pairs = {{0,11}, {1,10}, {2,9}, {3,8}};
@@ -139,16 +130,17 @@ TEST_CASE("Test folding a hairpin without an aptamer", "[scoring]") {
 	}
 
 	SECTION("the macrostate probabilities are correct") {
-		CHECK(fold.macrostate_prob("((((xxxx))))") > 0.65);
+		CHECK(fold.macrostate_prob("...(....)...") > 0.95);
+		CHECK(fold.macrostate_prob("..((....))..") > 0.85);
+		CHECK(fold.macrostate_prob(".(((....))).") > 0.75);
 		CHECK(fold.macrostate_prob("((((....))))") > 0.65);
+		CHECK(fold.macrostate_prob("(((......)))") > 0.65);
+		CHECK(fold.macrostate_prob("((........))") > 0.65);
 		CHECK(fold.macrostate_prob("(..........)") > 0.65);
-
-		CHECK(fold.macrostate_prob("...(xxxx)...") > 0.95);
-		CHECK(fold.macrostate_prob("...(....)...") > 0.95);
-		CHECK(fold.macrostate_prob("...(....)...") > 0.95);
 
 		CHECK(fold.macrostate_prob("xxxxxxxxxxxx") < 0.05);
 		CHECK(fold.macrostate_prob("xxxx........") < 0.05);
+		CHECK(fold.macrostate_prob("....xxxx....") > 0.95);
 		CHECK(fold.macrostate_prob("........xxxx") < 0.05);
 	}
 }
@@ -160,8 +152,7 @@ TEST_CASE("Test folding a hairpin with an aptamer", "[scoring]") {
 	// ....((((((....)))...))).... [ΔG=-6.20 kcal/mol, apo]
 	// (...((.(((....)))....))...) [ΔG=-9.22 kcal/mol, holo]
 
-	ConstructPtr hairpin = make_shared<Construct>();
-	*hairpin += make_shared<Domain>("aptamer", "GAUACCAGCCGAAAGGCCCUUGGCAGC");
+	ConstructPtr hairpin = make_shared<Construct>("GAUACCAGCCGAAAGGCCCUUGGCAGC");
 
 	// Indicate which base pairs I expect to form.
 	set<bp> apo_base_pairs = {
@@ -172,8 +163,8 @@ TEST_CASE("Test folding a hairpin with an aptamer", "[scoring]") {
 	};
 
 	// Make sure the expected base pairs form.
-	ViennaRnaFold apo_fold(hairpin, LigandEnum::NONE);
-	ViennaRnaFold holo_fold(hairpin, LigandEnum::THEO);
+	ViennaRnaFold apo_fold(hairpin);
+	ViennaRnaFold holo_fold(hairpin, THEO_APTAMER);
 
 	for(int i = 0; i < hairpin->len(); i++) {
 		for(int j = i; j < hairpin->len(); j++) {
@@ -228,8 +219,8 @@ TEST_CASE("Test folding rhf(6)", "[scoring]") {
 	};
 
 	// Make sure the expected base pairs form in the expected conditions.
-	ViennaRnaFold apo_fold(rhf_6, LigandEnum::NONE);
-	ViennaRnaFold holo_fold(rhf_6, LigandEnum::THEO);
+	ViennaRnaFold apo_fold(rhf_6);
+	ViennaRnaFold holo_fold(rhf_6, THEO_APTAMER);
 
 	for(auto base_pair: constitutive_base_pairs) {
 		int i = base_pair.first.first;
@@ -261,15 +252,14 @@ TEST_CASE("Test folding rhf(6)", "[scoring]") {
 	
 	// Make sure the various macrostates have the expected populations.
 	CAPTURE(rhf_6->seq());
-	CAPTURE(rhf_6->active());
-	CHECK(apo_fold.macrostate_prob(rhf_6->active()) < 7e-5);
-	CHECK(holo_fold.macrostate_prob(rhf_6->active()) > 4e-3);
+	CAPTURE(rhf_6->macrostate("active"));
+	CHECK(apo_fold.macrostate_prob(rhf_6->macrostate("active")) < 7e-5);
+	CHECK(holo_fold.macrostate_prob(rhf_6->macrostate("active")) > 4e-3);
 }
 
 TEST_CASE("Test the score function class", "[scoring]") {
 	ScoreFunction scorefxn;
-	ConstructPtr dummy_construct = make_shared<Construct>();
-	*dummy_construct += make_shared<Domain>("dummy", "UUUU");
+	ConstructPtr dummy_construct = make_shared<Construct>("UUUU");
 
 	class DummyTerm : public ScoreTerm {
 
@@ -308,350 +298,57 @@ TEST_CASE("Test the score function class", "[scoring]") {
 	}
 }
 
-TEST_CASE("Test the 'favor wildtype' score term", "[scoring]") {
-	// Make a construct with individually indexable nucleotides.
-	ConstructPtr wt_construct = make_shared<Construct>();
-	*wt_construct += make_shared<Domain>("a", "AAAA");
-	*wt_construct += make_shared<Domain>("b", "UUUU");
+TEST_CASE("Test the 'macrostate prob' score term", "[scoring]") {
+	ConstructPtr dummy_construct = make_shared<Construct>("");
+	dummy_construct->add_macrostate("dummy", "");
 
-	ConstructPtr dummy_construct = make_shared<Construct>();
-	*dummy_construct += make_shared<Domain>("a", "AAAA");
-	*dummy_construct += make_shared<Domain>("b", "UUUU");
-
-	// Make a place-holder fold object.
-	DummyRnaFold dummy_fold;
-
-	// Define expected scores for various sequences.
 	struct Test {
-		vector<string> selection;
-		vector<string> dummy_seqs;
+		string name;
+		ConditionEnum condition;
+		FavorableEnum	favorable;
+		double apo_prob;
+		double holo_prob;
 		double expected_score;
 	};
 
 	vector<Test> tests = {
-		{{}, {"AAAA","UUUU"}, 0.0},
+		{"apo: not dummy",  ConditionEnum::APO,  FavorableEnum::NO,  0.2, 0.2, log(0.8)},
+		{"apo: not dummy",  ConditionEnum::APO,  FavorableEnum::NO,  0.9, 0.2, log(0.1)},
+		{"apo: not dummy",  ConditionEnum::APO,  FavorableEnum::NO,  0.2, 0.9, log(0.8)},
+		{"apo: not dummy",  ConditionEnum::APO,  FavorableEnum::NO,  0.9, 0.9, log(0.1)},
 
-		{{"a"}, {"UUUU","UUUU"}, 0.0},
-		{{"a"}, {"AAAA","UUUU"}, 1.0},
-		{{"a"}, {"AAAA","AAAA"}, 1.0},
+		{"apo: dummy",      ConditionEnum::APO,  FavorableEnum::YES, 0.2, 0.2, log(0.2)},
+		{"apo: dummy",      ConditionEnum::APO,  FavorableEnum::YES, 0.9, 0.2, log(0.9)},
+		{"apo: dummy",      ConditionEnum::APO,  FavorableEnum::YES, 0.2, 0.9, log(0.2)},
+		{"apo: dummy",      ConditionEnum::APO,  FavorableEnum::YES, 0.9, 0.9, log(0.9)},
 
-		{{"b"}, {"UUUU","UUUU"}, 1.0},
-		{{"b"}, {"AAAA","UUUU"}, 1.0},
-		{{"b"}, {"AAAA","AAAA"}, 0.0},
+		{"holo: not dummy", ConditionEnum::HOLO, FavorableEnum::NO,  0.2, 0.2, log(0.8)},
+		{"holo: not dummy", ConditionEnum::HOLO, FavorableEnum::NO,  0.9, 0.2, log(0.8)},
+		{"holo: not dummy", ConditionEnum::HOLO, FavorableEnum::NO,  0.2, 0.9, log(0.1)},
+		{"holo: not dummy", ConditionEnum::HOLO, FavorableEnum::NO,  0.9, 0.9, log(0.1)},
 
-		{{"a","b"}, {"UUUU","UUUU"}, 0.5},
-		{{"a","b"}, {"AAAA","UUUU"}, 1.0},
-		{{"a","b"}, {"AAAA","AAAA"}, 0.5},
-
-		{{"a"}, {"UAAA","AUUU"}, 0.75},
-		{{"a"}, {"UUAA","AAUU"}, 0.50},
-		{{"a"}, {"UUUA","AAAU"}, 0.25},
-
-		{{"b"}, {"UAAA","AUUU"}, 0.75},
-		{{"b"}, {"UUAA","AAUU"}, 0.50},
-		{{"b"}, {"UUUA","AAAU"}, 0.25},
-
-		{{"a","b"}, {"UAAA","AUUU"}, 0.75},
-		{{"a","b"}, {"UUAA","AAUU"}, 0.50},
-		{{"a","b"}, {"UUUA","AAAU"}, 0.25},
-
-		{{"a","b"}, {"UAAA","AAAU"}, 0.50},
-		{{"a","b"}, {"UUAA","AAUU"}, 0.50},
-		{{"a","b"}, {"UUUA","AUUU"}, 0.50},
+		{"holo: dummy",     ConditionEnum::HOLO, FavorableEnum::YES, 0.2, 0.2, log(0.2)},
+		{"holo: dummy",     ConditionEnum::HOLO, FavorableEnum::YES, 0.9, 0.2, log(0.2)},
+		{"holo: dummy",     ConditionEnum::HOLO, FavorableEnum::YES, 0.2, 0.9, log(0.9)},
+		{"holo: dummy",     ConditionEnum::HOLO, FavorableEnum::YES, 0.9, 0.9, log(0.9)},
 	};
 
-	// Each scenario is scored correctly.
 	for(Test test: tests) {
-		FavorWildtypeTerm term(wt_construct, test.selection);
-		dummy_construct->domain("a")->seq(test.dummy_seqs[0]);
-		dummy_construct->domain("b")->seq(test.dummy_seqs[1]);
+		DummyRnaFold dummy_apo_fold(test.apo_prob);
+		DummyRnaFold dummy_holo_fold(test.holo_prob);
 
-		double score = term.evaluate(dummy_construct, dummy_fold, dummy_fold);
+		CAPTURE(test.condition)
+		CAPTURE(test.favorable)
+		CAPTURE(test.apo_prob)
+		CAPTURE(test.holo_prob)
 
-		CAPTURE(test.selection);
-		CAPTURE(test.dummy_seqs);
-		CHECK(score == Approx(test.expected_score));
-	}
-}
-
-TEST_CASE("Test the 'ligand sensitivity' score term", "[scoring]") {
-	// Make a construct with individually indexable nucleotides.
-	ConstructPtr dummy_construct = make_shared<Construct>();
-	*dummy_construct += make_shared<Domain>("a", "UU");
-	*dummy_construct += make_shared<Domain>("b", "U");
-	*dummy_construct += make_shared<Domain>("c", "U");
-
-	// Define fake base-pairing probabilities for this construct.
-	DummyRnaFold dummy_apo_fold;
-	DummyRnaFold dummy_holo_fold;
-
-	dummy_apo_fold[{0,3}] = 0.20;
-	dummy_holo_fold[{0,3}] = 0.40;
-
-	dummy_apo_fold[{1,2}] = 0.30;
-	dummy_holo_fold[{1,2}] = 0.10;
-
-	// Define expected scores for various combinations of nucleotides.
-	struct Test {
-		vector<string> selection;
-		double expected_score;
-	};
-
-	vector<Test> tests = {
-		// The score increases with the number of ligand-sensitive base pairs.
-		{{"a","b"}, (0.3-0.1)*log(3)/3},
-		{{"a","c"}, (0.4-0.2)*log(2)/3},
-		{{"a","b","c"}, (0.3-0.1)*log(3)/4 + (0.4-0.2)*log(2)/4},
-
-		// The score is 0 if there aren't any base pairs.
-		{{},    0},
-		{{"a"}, 0},
-		{{"b"}, 0},
-		{{"c"}, 0}
-	};
-
-	// Each scenario is scored correctly.
-	for(Test test: tests) {
-		LigandSensitivityTerm term("dummy", test.selection);
+		MacrostateProbTerm term(
+				"dummy", test.condition, test.favorable);
 		double score = term.evaluate(
 				dummy_construct, dummy_apo_fold, dummy_holo_fold);
 
-		CAPTURE(test.selection);
+		CHECK(term.name() == test.name);
 		CHECK(score == Approx(test.expected_score));
 	}
 }
-
-TEST_CASE("Test the 'conditionally paired' score term", "[scoring]") {
-	// Make a construct with individually indexable nucleotides.
-	ConstructPtr dummy_construct = make_shared<Construct>();
-	*dummy_construct += make_shared<Domain>("a", "U");
-	*dummy_construct += make_shared<Domain>("A", "U");
-	*dummy_construct += make_shared<Domain>("b", "U");
-	*dummy_construct += make_shared<Domain>("B", "U");
-
-	// Define fake base-pairing probabilities for this construct.
-	DummyRnaFold dummy_apo_fold;
-	DummyRnaFold dummy_holo_fold;
-
-	dummy_apo_fold[{0,1}] = 0.20;
-	dummy_holo_fold[{0,1}] = 0.40;
-
-	dummy_apo_fold[{2,3}] = 0.30;
-	dummy_holo_fold[{2,3}] = 0.10;
-
-	// Define expected scores for various combinations of nucleotides.
-	struct Test {
-		vector<string> selection;
-		vector<string> targets;
-		double expected_score;
-	};
-
-	vector<Test> tests = {
-		// The score is proportional to the ligand sensitivity of the base pair.
-		{{"a"}, {"A"},  0.6*log(2)},
-		{{"b"}, {"B"}, -0.4*log(3)},
-
-		// The score is normalized by the number of nucleotides in the selection.
-		{{"a"},     {"A","B"},  0.6*log(2)/1},
-		{{"b"},     {"A","B"}, -0.4*log(3)/1},
-		{{"a","b"}, {"A"},      0.6*log(2)/2},
-		{{"a","b"}, {"B"},     -0.4*log(3)/2},
-		{{"a","b"}, {"A","B"},  0.6*log(2)/2 -0.4*log(3)/2},
-
-		// The score is 0 if there aren't any base pairs.
-		{{},    {},    0},
-		{{"a"}, {},    0},
-		{{"a"}, {"a"}, 0},
-		{{"a"}, {"B"}, 0},
-		{{"b"}, {},    0},
-		{{"b"}, {"b"}, 0},
-		{{"b"}, {"A"}, 0},
-	};
-
-	// Each scenario is scored correctly in both the apo and holo conditions.
-	for(Test test: tests) {
-		ConditionallyPairedTerm apo_term(
-				"dummy", ConditionEnum::APO, test.selection, test.targets);
-		ConditionallyPairedTerm holo_term(
-				"dummy", ConditionEnum::HOLO, test.selection, test.targets);
-
-		double apo_score = apo_term.evaluate(
-				dummy_construct, dummy_apo_fold, dummy_holo_fold);
-		double holo_score = holo_term.evaluate(
-				dummy_construct, dummy_apo_fold, dummy_holo_fold);
-
-		CAPTURE(test.selection);
-		CAPTURE(test.targets);
-
-		CHECK(apo_score == Approx(-test.expected_score));
-		CHECK(holo_score == Approx(test.expected_score));
-	}
-}
-
-TEST_CASE("Test the 'conditionally unpaired' score term", "[scoring]") {
-	// Make a construct with individually indexable nucleotides.
-	ConstructPtr dummy_construct = make_shared<Construct>();
-	*dummy_construct += make_shared<Domain>("a", "U");
-	*dummy_construct += make_shared<Domain>("A", "U");
-	*dummy_construct += make_shared<Domain>("b", "U");
-	*dummy_construct += make_shared<Domain>("B", "U");
-
-	// Define fake base-pairing probabilities for this construct.
-	DummyRnaFold dummy_apo_fold;
-	DummyRnaFold dummy_holo_fold;
-
-	dummy_apo_fold[{0,1}]  = 0.8; // p_unpaired(0, apo)  = 0.2
-	dummy_holo_fold[{0,1}] = 0.6; // p_unpaired(0, holo) = 0.4
-
-	dummy_apo_fold[{2,3}]  = 0.6; // p_unpaired(2, apo)  = 0.3
-	dummy_apo_fold[{2,1}]  = 0.1;
-	dummy_holo_fold[{2,3}] = 0.6; // p_unpaired(2, holo) = 0.1
-	dummy_holo_fold[{2,1}] = 0.3;
-
-	// Define expected scores for various combinations of nucleotides.
-	struct Test {
-		vector<string> selection;
-		double expected_score;
-	};
-
-	vector<Test> tests = {
-		{{},         0},
-		{{"a"},      0.6*log(2)},
-		{{"b"},     -0.4*log(3)},
-		{{"a","b"},  0.6*log(2)/2 -0.4*log(3)/2}
-	};
-
-	// Each scenario is scored correctly in both the apo and holo conditions.
-	for(Test test: tests) {
-		ConditionallyUnpairedTerm apo_term(
-				"dummy", ConditionEnum::APO, test.selection);
-		ConditionallyUnpairedTerm holo_term(
-				"dummy", ConditionEnum::HOLO, test.selection);
-
-		double apo_score = apo_term.evaluate(
-				dummy_construct, dummy_apo_fold, dummy_holo_fold);
-		double holo_score = holo_term.evaluate(
-				dummy_construct, dummy_apo_fold, dummy_holo_fold);
-
-		CAPTURE(test.selection);
-
-		CHECK(apo_score == Approx(-test.expected_score));
-		CHECK(holo_score == Approx(test.expected_score));
-	}
-}
-
-TEST_CASE("Test the 'always paired' score term", "[scoring]") {
-	// Make a construct with individually indexable nucleotides.
-	ConstructPtr dummy_construct = make_shared<Construct>();
-	*dummy_construct += make_shared<Domain>("a", "U");
-	*dummy_construct += make_shared<Domain>("A", "U");
-	*dummy_construct += make_shared<Domain>("b", "U");
-	*dummy_construct += make_shared<Domain>("B", "U");
-	*dummy_construct += make_shared<Domain>("c", "U");
-	*dummy_construct += make_shared<Domain>("C", "U");
-
-	// Define fake base-pairing probabilities for this construct.
-	DummyRnaFold dummy_apo_fold;
-	DummyRnaFold dummy_holo_fold;
-
-	dummy_apo_fold[{0,1}] = 0.50;
-	dummy_holo_fold[{0,1}] = 0.25;
-
-	dummy_apo_fold[{2,3}] = 0.80;
-	dummy_holo_fold[{2,3}] = 0.90;
-
-	dummy_apo_fold[{3,4}] = 1.00;
-	dummy_holo_fold[{3,4}] = 1.00;
-
-	// Define expected scores for various combinations of nucleotides.
-	struct Test {
-		vector<string> selection;
-		vector<string> targets;
-		double expected_score;
-	};
-
-	vector<Test> tests = {
-		// The score indicates how well the base pair forms in both conditions.
-		{{"a"}, {"A"}, -log(1*3)/2},
-		{{"b"}, {"B"}, +log(4*9)/2},
-
-		// The score is normalized by the number of nucleotides in the selection.
-		{{"a"},     {"A","B"}, -log(1*3)/2},
-		{{"b"},     {"A","B"}, +log(4*9)/2},
-		{{"a","b"}, {"A"},     -log(1*3)/4},
-		{{"a","b"}, {"B"},     +log(4*9)/4},
-		{{"a","b"}, {"A","B"}, -log(1*3)/4 +log(4*9)/4},
-
-		// The score is 0 if there aren't any base pairs.
-		{{},    {},    0},
-		{{"a"}, {},    0},
-		{{"a"}, {"a"}, 0},
-		{{"a"}, {"B"}, 0},
-		{{"b"}, {},    0},
-		{{"b"}, {"b"}, 0},
-		{{"b"}, {"A"}, 0},
-
-		// Counter-intuitively, the score is also zero if no off-targets are 
-		// possible, because otherwise it would be infinite in this case.
-		{{"c"}, {"C"}, 0}
-	};
-
-	// Each scenario is scored correctly in both the apo and holo conditions.
-	for(Test test: tests) {
-		AlwaysPairedTerm term(
-				"dummy", test.selection, test.targets);
-
-		double score = term.evaluate(
-				dummy_construct, dummy_apo_fold, dummy_holo_fold);
-
-		CAPTURE(test.selection);
-		CAPTURE(test.targets);
-
-		CHECK(score == Approx(test.expected_score));
-	}
-}
-
-TEST_CASE("Test the 'always unpaired' score term", "[scoring]") {
-	// Make a construct with individually indexable nucleotides.
-	ConstructPtr dummy_construct = make_shared<Construct>();
-	*dummy_construct += make_shared<Domain>("a", "U");
-	*dummy_construct += make_shared<Domain>("A", "U");
-	*dummy_construct += make_shared<Domain>("b", "U");
-	*dummy_construct += make_shared<Domain>("B", "U");
-
-	// Define fake base-pairing probabilities for this construct.
-	DummyRnaFold dummy_apo_fold;
-	DummyRnaFold dummy_holo_fold;
-
-	dummy_apo_fold[{0,1}]  = 0.50; // p_unpaired(0, apo)  = 0.50
-	dummy_holo_fold[{0,1}] = 0.75; // p_unpaired(0, holo) = 0.25
-
-	dummy_apo_fold[{2,3}]  = 0.10; // p_unpaired(2, apo)  = 0.80
-	dummy_apo_fold[{2,1}]  = 0.10;
-	dummy_holo_fold[{2,3}] = 0.05; // p_unpaired(2, holo) = 0.90
-	dummy_holo_fold[{2,1}] = 0.05;
-
-	// Define expected scores for various combinations of nucleotides.
-	struct Test {
-		vector<string> selection;
-		double expected_score;
-	};
-
-	vector<Test> tests = {
-		{{},         0},
-		{{"a"},     -log(1*3)/2},
-		{{"b"},     +log(4*9)/2},
-		{{"a","b"}, -log(1*3)/4 +log(4*9)/4}
-	};
-
-	// Each scenario is scored correctly in both the apo and holo conditions.
-	for(Test test: tests) {
-		AlwaysUnpairedTerm apo_term("dummy", test.selection);
-		double score = apo_term.evaluate(
-				dummy_construct, dummy_apo_fold, dummy_holo_fold);
-		CAPTURE(test.selection);
-		CHECK(score == Approx(test.expected_score));
-	}
-}
-
 

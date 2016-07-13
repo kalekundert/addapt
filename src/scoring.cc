@@ -12,13 +12,13 @@ extern "C" {
 
 #include "scoring.hh"
 
-namespace sgrna_design {
+namespace addapt {
 
-ViennaRnaFold::ViennaRnaFold(ConstructConstPtr sgrna, LigandEnum ligand):
+ViennaRnaFold::ViennaRnaFold(ConstructConstPtr sgrna, AptamerConstPtr aptamer):
 
 	my_sgrna(sgrna),
+	my_aptamer(aptamer),
 	my_seq(sgrna->seq()),
-	my_ligand(ligand),
 	my_bppm_fc(nullptr) {
 
 	// Upper-casing the sequence is critically important!  Without this step, 
@@ -51,21 +51,21 @@ ViennaRnaFold::base_pair_prob(int a, int b) const {
 }
 	
 double
-ViennaRnaFold::macrostate_prob(string macrostate) const {
+ViennaRnaFold::macrostate_prob(string constraint) const {
 	vrna_fold_compound_t *fc = make_fold_compound(false);
 
 	// Calculate the free energy for the whole ensemble.
 	double g_tot = vrna_pf(fc, NULL);
 
-	// Add a constraint that defines the "active" macrostate.
-	vrna_constraints_add(fc, macrostate.c_str(),
+	// Add a constraint that defines the given macrostate.
+	vrna_constraints_add(fc, constraint.c_str(),
 			VRNA_CONSTRAINT_DB_DEFAULT | VRNA_CONSTRAINT_DB_ENFORCE_BP);
 
-	// Calculate the free energy for the "active" macrostate.
+	// Calculate the free energy for the given macrostate.
 	double g_active = vrna_pf(fc, NULL);
 
-	// Return the probability that the construct will be in the "active" 
-	// macrostate at equilibrium.
+	// Return the probability that the construct will be in the given macrostate 
+	// at equilibrium.
 	double kT = fc->exp_params->kT / 1000;
 	return exp((g_tot - g_active) / kT);
 }
@@ -85,28 +85,15 @@ ViennaRnaFold::make_fold_compound(bool compute_bppm) const {
 		vrna_fold_compound(my_seq.c_str(), &md, VRNA_OPTION_PF);
 	my_fcs.push_back(fc);
 
-	// Add the aptamer motif.
-	char const *aptamer_seq = NULL;
-	char const *aptamer_fold = NULL;
-	double aptamer_kd_uM = 0;
-
-	switch(my_ligand) {
-		case LigandEnum::NONE :
-			break;
-		case LigandEnum::THEO :
-			aptamer_seq =  "GAUACCAGCCGAAAGGCCCUUGGCAGC";
-			aptamer_fold = "(...((.(((....)))....))...)";
-			aptamer_kd_uM = 0.32;
-			break;
-	}
-
-	if (aptamer_seq) {
-		//double rt_37 = 1.9858775e-3 * 310;  // kcal/mol at 37°C
-		//double std_conc = 1e6;              // 1M in μM
+	// Add the aptamer, if we were given one.
+	if (my_aptamer) {
 		double kT = fc->exp_params->kT / 1000;
-		double aptamer_dg = kT * log(aptamer_kd_uM / 1e6);
 		vrna_sc_add_hi_motif(
-				fc, aptamer_seq, aptamer_fold, aptamer_dg, VRNA_OPTION_DEFAULT);
+				fc,
+				my_aptamer->seq().c_str(),
+				my_aptamer->fold().c_str(),
+				kT * log(my_aptamer->affinity() / 1e6),
+				VRNA_OPTION_DEFAULT);
 	}
 
 	return fc;
@@ -126,8 +113,8 @@ ScoreFunction::evaluate(
 		ConstructConstPtr sgrna,
 		EvaluatedScoreFunction &table) const {
 
-	ViennaRnaFold apo_fold(sgrna, LigandEnum::NONE);
-	ViennaRnaFold holo_fold(sgrna, LigandEnum::THEO);
+	ViennaRnaFold apo_fold(sgrna);
+	ViennaRnaFold holo_fold(sgrna, my_aptamer);
 
 	double score = 0;
 	double evaluated_term;
@@ -141,6 +128,16 @@ ScoreFunction::evaluate(
 	}
 
 	return score;
+}
+
+AptamerConstPtr
+ScoreFunction::aptamer() const {
+	return my_aptamer;
+}
+
+void
+ScoreFunction::aptamer(AptamerConstPtr aptamer) {
+	my_aptamer = aptamer;
 }
 
 void 
@@ -173,6 +170,7 @@ VariedSpacerScoreFunction::evaluate(
 	
 	// Score the sgRNA with all the spacers this score function knows about.
 	table.clear();
+	/*
 	for(string spacer: my_spacers) {
 		ConstructPtr sgrna_i = sgrna->copy();
 		EvaluatedScoreFunction table_i;
@@ -187,6 +185,7 @@ VariedSpacerScoreFunction::evaluate(
 			table.push_back(row);
 		}
 	}
+	*/
 
 	// Normalize the score by the number of spacers.
 	return score / N;
@@ -237,377 +236,50 @@ ScoreTerm::weight(double weight) {
 }
 
 
-vector<int>
-domains_to_indices(
-		ConstructConstPtr sgrna,
-		vector<string> domains) {
-
-	vector<int> indices;
-
-	for(string domain: domains) {
-		for(int i = sgrna->index_5(domain); i <= sgrna->index_3(domain); i++) {
-			indices.push_back(i);
-		}
-	}
-
-	return indices;
-}
-
-
-FavorWildtypeTerm::FavorWildtypeTerm(
-		ConstructConstPtr wt,
-		vector<string> selection,
-		double weight):
-
-	ScoreTerm("favor_wt", weight),
-	my_wt(wt),
-	my_selection(selection) {}
-
-double
-FavorWildtypeTerm::evaluate(
-		ConstructConstPtr sgrna,
-		RnaFold const &apo_fold,
-		RnaFold const &holo_fold) const {
-
-	int wt_nucs = 0;
-	int num_positions = 0;
-
-	if(my_selection.empty()) {
-		return 0;
-	}
-
-	for(string k: my_selection) {
-		for(int i = 0; i < my_wt->domain(k)->len(); i++) {
-			wt_nucs += (sgrna->domain(k)->seq()[i] == my_wt->domain(k)->seq()[i]);
-			num_positions += 1;
-		}
-	}
-
-	return static_cast<double>(wt_nucs) / num_positions;
-}
-
-
-ActiveMacrostateTerm::ActiveMacrostateTerm(double weight):
-	ScoreTerm("active_macrostate", weight) {}
-
-double
-ActiveMacrostateTerm::evaluate(
-		ConstructConstPtr sgrna,
-		RnaFold const &apo_fold,
-		RnaFold const &holo_fold) const {
-
-	double p_apo = apo_fold.macrostate_prob(sgrna->active());
-	double p_holo = holo_fold.macrostate_prob(sgrna->active());
-
-	// Return the natural logarithm of the calculated probability so this score 
-	// term can be properly added to others.
-	return log(1 - p_apo) + log(p_holo);
-}
-
-
-// Most of these score terms have the same general form:
-//
-// Sum[
-//  Prob{desired fold} × log(Enrichment{desired fold over undesired fold})
-// ]
-//
-// A fold is a base pair for the "paired" score terms or an unpaired nucleotide 
-// for the "unpaired" score terms.  For the "conditional" score terms, the 
-// undesired fold is the same fold as the desired fold, but in the opposite 
-// condition (e.g. apo vs. holo).  For the "always" score terms, the undesired 
-// fold is anything that's not the desired fold, in the same condition.  So 
-// Prob{undesired fold} = 1 - Prob{desired fold}.
-//
-// You can think of the probability term as counting how many nucleotides have 
-// the desired fold.  You can think of the enrichment term as weighting that by 
-// how much more likely the desired fold is compared to the undesired fold.  
-// The logarithm is important because it allows the enrichments to be summed.
-//
-// In some cases, negative terms for undesired folds are included.  However, 
-// these can be confusing to look at, because you have to remember that the 
-// sign of the logarithm changes depending on which fold is more probable.  
-// Written fully out, these negative terms would look like:
-//
-// + Prob{desired fold} × | log(Enrichment{desired over undesired}) |
-// - Prob{undesired fold} × | log(Enrichment{undesired over desired}) |
-//
-// where |x| represents the absolute value of x.  It turns out that the above 
-// expression has a more succinct form:
-//
-// (Prob{desired fold} + Prob{undesired fold})
-//   × log(Enrichment{desired fold over undesired fold})
-
-LigandSensitivityTerm::LigandSensitivityTerm(
-		string name,
-		vector<string> selection,
-		double weight):
-
-	ScoreTerm(name, weight),
-	my_selection(selection) {}
-
-double
-LigandSensitivityTerm::evaluate(
-		ConstructConstPtr sgrna,
-		RnaFold const &apo_fold,
-		RnaFold const &holo_fold) const {
-
-	// Return the number of base pairs (combined between the apo and holo states) 
-	// weighted by how much more likely each base pair is in one state compared 
-	// to the other.
-
-	double sensitivity = 0;
-	double p_apo, p_holo;
-
-	vector<int> indices = domains_to_indices(sgrna, my_selection);
-
-	if(indices.empty()) {
-		return 0;
-	}
-
-	for(auto it_i = indices.begin(); it_i != indices.end(); it_i++) {
-		for(auto it_j = it_i; it_j != indices.end(); it_j++) {
-			p_apo = apo_fold.base_pair_prob(*it_i, *it_j);
-			p_holo = holo_fold.base_pair_prob(*it_i, *it_j);
-
-			if(p_apo > 0 and p_holo > 0) {
-				sensitivity += p_apo * log(p_apo / p_holo);
-				sensitivity += p_holo * log(p_holo / p_apo);
-			}
-		}
-	}
-
-	// There is some cancellation going on here.  We should double the 
-	// normalization factor because we counted base pairs in apo state and the 
-	// holo state, but we should halve it because we can only expect N 
-	// nucleotides to form at most N/2 base pairs.
-
-	return sensitivity / indices.size();
-}
-
-
-ConditionallyPairedTerm::ConditionallyPairedTerm(
-		string name,
+MacrostateProbTerm::MacrostateProbTerm(
+		string macrostate,
 		ConditionEnum condition,
-		vector<string> selection,
-		vector<string> targets,
-		double weight):
+		FavorableEnum favorable):
 
-	ScoreTerm(name, weight),
+	ScoreTerm("active_macrostate"),
+	my_macrostate(macrostate),
 	my_condition(condition),
-	my_selection(selection),
-	my_targets(targets) {}
+	my_favorable(favorable) {
 
-double
-ConditionallyPairedTerm::evaluate(
-		ConstructConstPtr sgrna,
-		RnaFold const &apo_fold,
-		RnaFold const &holo_fold) const {
-
-	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
-	vector<int> target_indices = domains_to_indices(sgrna, my_targets);
-
-	if(selection_indices.empty()) {
-		return 0;
-	}
-
-	double sensitivity = 0;
-	double p_apo, p_holo;
-
-	for(int i: selection_indices) {
-		for(int j: target_indices) {
-			p_apo = apo_fold.base_pair_prob(i, j);
-			p_holo = holo_fold.base_pair_prob(i, j);
-
-			// The calculation below obscures the meaning of the score term.  I think 
-			// the meaning is easier to see if you keep the following (mathematically 
-			// equivalent) expression in mind:
-			//
-			// + Prob{paired, right condition} × log(Enrichment{right condition})
-			// - Prob{paired, wrong condition} × log(Enrichment{wrong condition}),
-			//
-			// where Enrichment is how much more likely the nucleotide is to be 
-			// paired with the relevant partner in the given condition. The logarithm 
-			// is important because it allows us to sum these sub-expressions.
-
-			if(p_apo > 0 and p_holo > 0) {
-				switch(my_condition) {
-					case ConditionEnum::APO:
-						sensitivity += (p_apo + p_holo) * log(p_apo / p_holo);
-						break;
-					case ConditionEnum::HOLO:
-						sensitivity += (p_holo + p_apo) * log(p_holo / p_apo);
-						break;
-				}
-			}
-		}
-	}
-
-	return sensitivity / selection_indices.size();
+	string desc;
+	desc += (my_condition == ConditionEnum::APO)? "apo" : "holo";
+	desc += ": ";
+	desc += (my_favorable == FavorableEnum::NO)? "not " : "";
+	desc += macrostate;
+	name(desc);
 }
 
-
-ConditionallyUnpairedTerm::ConditionallyUnpairedTerm(
-		string name,
-		ConditionEnum condition,
-		vector<string> selection,
-		double weight):
-
-	ScoreTerm(name, weight),
-	my_condition(condition),
-	my_selection(selection) {}
-
 double
-ConditionallyUnpairedTerm::evaluate(
+MacrostateProbTerm::evaluate(
 		ConstructConstPtr sgrna,
 		RnaFold const &apo_fold,
 		RnaFold const &holo_fold) const {
 
-	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
-
-	if(selection_indices.empty()) {
-		return 0;
+	// Get a pointer to the right folding engine.
+	RnaFold const *apropos_fold;
+	switch(my_condition) {
+		case ConditionEnum::APO: apropos_fold = &apo_fold; break;
+		case ConditionEnum::HOLO: apropos_fold = &holo_fold; break;
 	}
 
-	double sensitivity = 0;
+	// Calculate the probability of adopting this fold in this condition.
+	string constraint = sgrna->macrostate(my_macrostate);
+	double macrostate_prob = apropos_fold->macrostate_prob(constraint);
 
-	for(int i: selection_indices) {
-		double p_apo = 1;   // Probability that nucleotide ``i`` is unpaired
-		double p_holo = 1;  // in the given condition.
-
-		for(int j = 0; j < sgrna->len(); j++) {
-			p_apo -= apo_fold.base_pair_prob(i, j);
-			p_holo -= holo_fold.base_pair_prob(i, j);
-		}
-
-		// The calculation below obscures the meaning of the score term.  I think 
-		// the meaning is easier to see if you keep the following (mathematically 
-		// equivalent) expression in mind:
-		//
-		// + Prob{unpaired, right condition} × log(Enrichment{right condition})
-		// - Prob{unpaired, wrong condition} × log(Enrichment{wrong condition}),
-		//
-		// where Enrichment is how much more likely the nucleotide is to be 
-		// unpaired in the given condition. The logarithm is important because it 
-		// allows us to sum these sub-expressions.
-
-		if(p_apo > 0 and p_holo > 0) {
-			switch(my_condition) {
-				case ConditionEnum::APO:
-					sensitivity += (p_apo + p_holo) * log(p_apo / p_holo);
-					break;
-				case ConditionEnum::HOLO:
-					sensitivity += (p_holo + p_apo) * log(p_holo / p_apo);
-					break;
-			}
-		}
+	// Invert the probability if we want to avoid this fold in this condition.
+	switch(my_favorable) {
+		case FavorableEnum::YES: break;
+		case FavorableEnum::NO: macrostate_prob = 1 - macrostate_prob; break;
 	}
 
-	return sensitivity / selection_indices.size();
-}
-
-
-AlwaysPairedTerm::AlwaysPairedTerm(
-		string name,
-		vector<string> selection,
-		vector<string> targets,
-		double weight):
-
-	ScoreTerm(name, weight),
-	my_selection(selection),
-	my_targets(targets) {}
-
-double
-AlwaysPairedTerm::evaluate(
-		ConstructConstPtr sgrna,
-		RnaFold const &apo_fold,
-		RnaFold const &holo_fold) const {
-
-	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
-	vector<int> target_indices = domains_to_indices(sgrna, my_targets);
-
-	if(selection_indices.empty()) {
-		return 0;
-	}
-
-	double sensitivity = 0;
-
-	for(int i: selection_indices) {
-		double p_apo = 0;    // Probability that nucleotide ``i`` is paired
-		double p_holo = 0;   // with any of its allowed partners.
-
-		for(int j: target_indices) {
-			p_apo += apo_fold.base_pair_prob(i, j);
-			p_holo += holo_fold.base_pair_prob(i, j);
-		}
-
-		// Here, the probability of the undesired fold doesn't depend on the 
-		// condition, it's just one minus the probability of the desired fold.  
-		// This simplifies the basic score term expression even more, because the 
-		// probabilities sum to one and the only remaining term is the enrichment 
-		// ratio.  The enrichment ratios for both conditions are included.
-
-		if(p_apo > 0 and p_apo < 1 and p_holo > 0 and p_holo < 1) {
-			sensitivity += log(p_apo / (1 - p_apo));
-			sensitivity += log(p_holo / (1 - p_holo));
-		}
-	}
-
-	// Divide by two because there are two positive terms associated with each 
-	// base pair, one for correctly forming in the apo condition and another for 
-	// the holo condition.
-
-	return sensitivity / selection_indices.size() / 2;
-}
-
-
-AlwaysUnpairedTerm::AlwaysUnpairedTerm(
-		string name,
-		vector<string> selection,
-		double weight):
-
-	ScoreTerm(name, weight),
-	my_selection(selection) {}
-
-double
-AlwaysUnpairedTerm::evaluate(
-		ConstructConstPtr sgrna,
-		RnaFold const &apo_fold,
-		RnaFold const &holo_fold) const {
-
-	vector<int> selection_indices = domains_to_indices(sgrna, my_selection);
-
-	if(selection_indices.empty()) {
-		return 0;
-	}
-
-	double sensitivity = 0;
-
-	for(int i: selection_indices) {
-		double p_apo = 1;    // Probability that nucleotide ``i`` is unpaired
-		double p_holo = 1;   // in the given condition.
-
-		for(int j = 0; j < sgrna->len(); j++) {
-			p_apo -= apo_fold.base_pair_prob(i, j);
-			p_holo -= holo_fold.base_pair_prob(i, j);
-		}
-
-		// Here, the probability of the undesired fold doesn't depend on the 
-		// condition, it's just one minus the probability of the desired fold.  
-		// This simplifies the basic score term expression even more, because the 
-		// probabilities sum to one and the only remaining term is the enrichment 
-		// ratio.  The enrichment ratios for both conditions are included.
-
-		if(p_apo > 0 and p_apo < 1 and p_holo > 0 and p_holo < 1) {
-			sensitivity += log(p_apo / (1 - p_apo));
-			sensitivity += log(p_holo / (1 - p_holo));
-		}
-	}
-
-	// Divide by two because there are two positive terms associated with each 
-	// nucleotide, one for being unpaired in the apo condition and another for 
-	// the holo condition.
-
-	return sensitivity / selection_indices.size() / 2;
+	// Return the natural logarithm of the calculated probability to improve 
+	// dynamic range and to allow these terms to be summed.
+	return log(macrostate_prob);
 }
 
 
@@ -616,10 +288,19 @@ AlwaysUnpairedTerm::evaluate(
 namespace std {
 
 ostream &
-operator<<(ostream& out, const sgrna_design::ConditionEnum& condition) {
+operator<<(ostream& out, const addapt::ConditionEnum& condition) {
 	switch(condition) {
-		case sgrna_design::ConditionEnum::APO: out << "APO"; break;
-		case sgrna_design::ConditionEnum::HOLO: out << "HOLO"; break;
+		case addapt::ConditionEnum::APO: out << "APO"; break;
+		case addapt::ConditionEnum::HOLO: out << "HOLO"; break;
+	}
+	return out;
+}
+
+ostream &
+operator<<(ostream& out, const addapt::FavorableEnum& condition) {
+	switch(condition) {
+		case addapt::FavorableEnum::YES: out << "FAVORABLE"; break;
+		case addapt::FavorableEnum::NO: out << "UNFAVORABLE"; break;
 	}
 	return out;
 }

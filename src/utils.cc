@@ -1,6 +1,6 @@
 #include "utils.hh"
 
-namespace sgrna_design {
+namespace addapt {
 
 int
 normalize_index(string sequence, int index, IndexEnum meaning) {

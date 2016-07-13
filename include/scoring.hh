@@ -16,7 +16,7 @@ extern "C" {
 
 #include "model.hh"
 
-namespace sgrna_design {
+namespace addapt {
 
 class ScoreFunction;
 using ScoreFunctionPtr = std::shared_ptr<ScoreFunction>;
@@ -36,6 +36,11 @@ enum class LigandEnum {
 enum class ConditionEnum {
 	APO,
 	HOLO,
+};
+
+enum class FavorableEnum {
+	NO,
+	YES,
 };
 
 
@@ -60,7 +65,7 @@ class ViennaRnaFold : public RnaFold {
 public:
 
 	/// @brief Predict how the construct will fold.
-	ViennaRnaFold(ConstructConstPtr, LigandEnum=LigandEnum::NONE);
+	ViennaRnaFold(ConstructConstPtr, AptamerConstPtr=nullptr);
 
 	/// @brief Free the ViennaRNA data structures.
 	~ViennaRnaFold();
@@ -81,10 +86,11 @@ private:
 private:
 
 	ConstructConstPtr my_sgrna;
-	// We need to store our own copy of the sgRNA sequence to ensure that the 
-	// pointer returned by c_str() is valid.
+	AptamerConstPtr my_aptamer;
+
+	// We (used to) need to store our own copy of the sgRNA sequence to ensure 
+	// that the pointer returned by c_str() is valid.
 	string my_seq;
-	LigandEnum my_ligand;
 
 	// We need to store a list of all the fold compound data structures we end up 
 	// creating so we can deallocate them all.
@@ -115,8 +121,15 @@ public:
 	/// @brief Add a term to this score function.
 	void operator+=(ScoreTermPtr);
 
+	/// @brief Return the aptamer being used by this score function.
+	AptamerConstPtr aptamer() const;
+
+	/// @brief Set the aptamer being used by this score function.
+	void aptamer(AptamerConstPtr);
+
 private:
 	ScoreTermList my_terms;
+	AptamerConstPtr my_aptamer;
 
 };
 
@@ -192,122 +205,24 @@ private:
 
 };
 
-class FavorWildtypeTerm : public ScoreTerm {
+class MacrostateProbTerm : public ScoreTerm {
 
 public:
 
-	FavorWildtypeTerm(
-			ConstructConstPtr, vector<string>, double=1.0);
+	/// @brief Initialize the score term with a fold, a condition, and an 
+	/// indication of whether or not we want that fold in that condition.
+	MacrostateProbTerm(string, ConditionEnum, FavorableEnum=FavorableEnum::YES);
 
-	/// @brief The fraction of the nucleotides in the selected domains that have 
-	/// been mutated.
-	double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+	/// @brief Calculate the log probability that the given construct adopts the 
+	/// given fold in the given condition.
+	double evaluate(ConstructConstPtr, RnaFold const &, RnaFold const &) const;
 
 private:
-
-	ConstructConstPtr my_wt;
-	vector<string> my_selection;
-
-};
-
-class ActiveMacrostateTerm : public ScoreTerm {
-
-public:
-
-	ActiveMacrostateTerm(double=1.0);
-
-	double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+		string my_macrostate;
+		ConditionEnum my_condition;
+		FavorableEnum my_favorable;
 
 };
-
-class LigandSensitivityTerm : public ScoreTerm {
-
-public:
-
-	LigandSensitivityTerm(
-			string, vector<string>, double=1.0);
-
-	double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
-
-private:
-
-	vector<string> my_selection;
-
-};
-
-class ConditionallyPairedTerm : public ScoreTerm {
-
-public:
-
-	ConditionallyPairedTerm(
-			string, ConditionEnum, vector<string>, vector<string>, double=1.0);
-
-	double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
-
-private:
-
-	ConditionEnum my_condition;
-	vector<string> my_selection;
-	vector<string> my_targets;
-
-};
-
-class ConditionallyUnpairedTerm : public ScoreTerm {
-
-public:
-
-	ConditionallyUnpairedTerm(
-			string, ConditionEnum, vector<string>, double=1.0);
-
-	double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
-
-private:
-
-	ConditionEnum my_condition;
-	vector<string> my_selection;
-
-};
-
-class AlwaysPairedTerm : public ScoreTerm {
-
-public:
-
-	AlwaysPairedTerm(
-			string, vector<string>, vector<string>, double=1.0);
-
-	double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
-
-private:
-
-	ConditionEnum my_condition;
-	vector<string> my_selection;
-	vector<string> my_targets;
-
-};
-
-class AlwaysUnpairedTerm : public ScoreTerm {
-
-public:
-
-	AlwaysUnpairedTerm(
-			string, vector<string>, double=1.0);
-
-	double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const;
-
-private:
-
-	ConditionEnum my_condition;
-	vector<string> my_selection;
-
-};
-
 
 
 }
@@ -315,6 +230,9 @@ private:
 namespace std {
 
 ostream&
-operator<<(ostream&, const sgrna_design::ConditionEnum&);
+operator<<(ostream&, const addapt::ConditionEnum&);
+
+ostream&
+operator<<(ostream&, const addapt::FavorableEnum&);
 
 }

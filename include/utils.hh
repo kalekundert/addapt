@@ -7,12 +7,13 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include <boost/format.hpp>
 
-namespace sgrna_design {
+namespace addapt {
 
 using f = boost::format;
 using std::make_shared;
@@ -21,6 +22,7 @@ using std::vector;
 using std::list;
 using std::pair;
 using std::map;
+using std::unordered_map;
 
 /// @brief Do the indices refer to the items in the collection themselves, or 
 /// to the spaces between the items?
