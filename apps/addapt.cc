@@ -25,40 +25,40 @@ Usage:
   addapt <config>... [options]
 
 Options:
-  -n --num-moves <num>           [default: 100]
+  -n <num>, --num-moves <num>                [default: 100]
     The number of moves to attempt in the design simulation.  I haven't yet 
     determined how many moves are required to reach convergence.
     
-  -T --temperature <schedule>    [default: auto]
+  -T <schedule>, --temperature <schedule>
     The temperature to use for the Metropolis criterion, which affects the 
     likelihood of accepting a negative move.  If T=0, only positive moves will 
     be accepted.  In the limit that T=inf, every move will be accepted.  You 
     can specify a fixed temperature (e.g. "5"), a multi-cooled simulated 
-    annealing schedule (e.g. "5 10=>0"), or schedule that tries to achieve 
-    a certain acceptance rate (e.g. "auto 50%").
+    annealing schedule (e.g. "1 to 0 in 500 steps"), or schedule that tries to 
+    achieve a certain acceptance rate (e.g. "auto 50%").
     
-  -r --random-seed <seed>        [default: 0]
+  -r <seed>, --random-seed <seed>            [default: 0]
     The seed for the random number generator.  If running in parallel, this 
     should be different for each job.
     
-  -o --output <path>             [default: traj.tsv]
+  -o <path>, --output <path>                 [default: traj.tsv]
     The path where the trajectory of the design simulation will be saved.  This 
     trajectory includes scores and sequences for every step of the simulation.
     
-  -i --output-interval <steps>   [default: 1]
+  -i <steps>, --output-interval <steps>      [default: 1]
     How often a new snapshot in the trajectory should be recorded.
     
-  -v --version
+  --version
     Display the version of ``addapt`` being used.
     
-  -h --help
+  -h, --help
     Display this usage information.
 )""";
 
 int main(int argc, char **argv) {
 	try {
 		map<string, docopt::value> args = docopt::docopt(
-				USAGE+1, {argv + 1, argv + argc}, true, "0.0");
+				USAGE+1, {argv + 1, argv + argc}, true, VERSION);
 		vector<string> config_files = args["<config>"].asStringList();
 		
 		// Create the device.

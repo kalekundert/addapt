@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([sgrna_monte_carlo], [0.0], [kale.kundert@ucsf.edu])
+AC_INIT([addapt], [1.0.0], [kale.kundert@ucsf.edu])
 AC_CONFIG_AUX_DIR([build/aux])
 AC_CONFIG_MACRO_DIR([build/m4])
 AC_CONFIG_FILES([Makefile])
@@ -62,11 +62,16 @@ AC_CHECK_HEADERS(
 AC_OUTPUT
 
 echo \
-"--------------------------------------------------
+"------------------------------------------------------------------------------
 
-  $PACKAGE_NAME $PACKAGE_VERSION
+Successfully configured $PACKAGE_NAME $PACKAGE_VERSION
 
   Prefix.........: $prefix
-  C++ Compiler...: $CXX $CXXFLAGS $CPPFLAGS
+  Compiler.......: $CXX $CXXFLAGS $CPPFLAGS
 
---------------------------------------------------"
+To build, run the following commands:
+
+  $ make
+  $ sudo make install
+
+------------------------------------------------------------------------------"

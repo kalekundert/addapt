@@ -4,14 +4,14 @@ import numpy as np
 import pandas as pd
 
 def load_trajectory(tsv_path):
-    return pd.read_table(tsv_path or 'logs/mh.tsv', comment='#')
+    return pd.read_table(tsv_path or 'traj.tsv', comment='#')
 
 def load_trajectories(tsv_paths):
     return [load_trajectory(x) for x in (tsv_paths or [None])]
 
 def load_initial_seq(tsv_path_or_paths):
     if not tsv_path_or_paths:
-        tsv_path = 'logs/mh.tsv'
+        tsv_path = 'traj.tsv'
     elif isinstance(tsv_path_or_paths, str):
         tsv_path = tsv_path_or_paths
     else:
