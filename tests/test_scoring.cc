@@ -42,8 +42,8 @@ private:
 
 };
 
-ConstructConstPtr
-build_rhf_6_construct() {
+DeviceConstPtr
+build_rhf_6_device() {
 	// 0....,....1....,....2....,....3....,....4....,....5....,....6....,....7....,....8....,....9....,....0.
 	// GUUUUAGAGCUAGAAAUAGCAAGUUAAAAUAAGGCUAGUCCCUUUUCGCCGAUACCAGCCGAAAGGCCCUUGGCAGCGACGGCACCGAGUCGGUGCUUUUUU
 	// (((((((.((((....))))...))))))).,,({{,{..|||{{(,((,{....,.||{}}}})),..,}))).,,||.(((((((...)))))))..... [ΔG=-29.58 kcal/mol, apo]
@@ -52,7 +52,7 @@ build_rhf_6_construct() {
 	string seq = "guuuuagagcuagaaauagcaaguuaaaauaaggcuaguccCuUUUCGCCgauaccagccgaaaggcccuuggcagcGACggcaccgagucggugcuuuuuu";
 	string cst = "(............................)xx..xxxxx..xxxxxx(...............................).(.............)......";
 
-	ConstructPtr rhf_6 = make_shared<Construct>(seq);
+	DevicePtr rhf_6 = make_shared<Device>(seq);
 	rhf_6->add_macrostate("active", cst);
 	return rhf_6;
 }
@@ -80,12 +80,12 @@ TEST_CASE("Test the DummyRnaFold helper class") {
 }
 
 TEST_CASE("Test folding a hairpin without an aptamer", "[scoring]") {
-	// Make a construct that should fold into a hairpin:
+	// Make a device that should fold into a hairpin:
 	
 	// ACGUGAAAACGU
 	// ((((....)))) [ΔG=-2.20 kcal/mol]
 
-	ConstructPtr hairpin = make_shared<Construct>("ACGUGAAAACGU");
+	DevicePtr hairpin = make_shared<Device>("ACGUGAAAACGU");
 
 	// Indicate which base pairs I expect to find.
 	set<bp> expected_base_pairs = {{0,11}, {1,10}, {2,9}, {3,8}};
@@ -146,13 +146,13 @@ TEST_CASE("Test folding a hairpin without an aptamer", "[scoring]") {
 }
 
 TEST_CASE("Test folding a hairpin with an aptamer", "[scoring]") {
-	// Make a construct consisting entirely of an aptamer:
+	// Make a device consisting entirely of an aptamer:
 
 	// GAUACCAGCCGAAAGGCCCUUGGCAGC
 	// ....((((((....)))...))).... [ΔG=-6.20 kcal/mol, apo]
 	// (...((.(((....)))....))...) [ΔG=-9.22 kcal/mol, holo]
 
-	ConstructPtr hairpin = make_shared<Construct>("GAUACCAGCCGAAAGGCCCUUGGCAGC");
+	DevicePtr hairpin = make_shared<Device>("GAUACCAGCCGAAAGGCCCUUGGCAGC");
 
 	// Indicate which base pairs I expect to form.
 	set<bp> apo_base_pairs = {
@@ -194,7 +194,7 @@ TEST_CASE("Test folding a hairpin with an aptamer", "[scoring]") {
 }
 
 TEST_CASE("Test folding rhf(6)", "[scoring]") {
-	ConstructConstPtr rhf_6 = build_rhf_6_construct();
+	DeviceConstPtr rhf_6 = build_rhf_6_device();
 
 	// Indicate which base pairs I expect to form.
 	map<bp,double> constitutive_base_pairs = {
@@ -259,7 +259,7 @@ TEST_CASE("Test folding rhf(6)", "[scoring]") {
 
 TEST_CASE("Test the score function class", "[scoring]") {
 	ScoreFunction scorefxn;
-	ConstructPtr dummy_construct = make_shared<Construct>("UUUU");
+	DevicePtr dummy_device = make_shared<Device>("UUUU");
 
 	class DummyTerm : public ScoreTerm {
 
@@ -269,7 +269,7 @@ TEST_CASE("Test the score function class", "[scoring]") {
 			ScoreTerm("dummy", weight), my_score(score) {}
 
 		double
-		evaluate(ConstructConstPtr, RnaFold const &, RnaFold const &) const {
+		evaluate(DeviceConstPtr, RnaFold const &, RnaFold const &) const {
 			return my_score;
 		}
 
@@ -278,29 +278,29 @@ TEST_CASE("Test the score function class", "[scoring]") {
 
 	};
 
-	CHECK(scorefxn.evaluate(dummy_construct) == 0);
+	CHECK(scorefxn.evaluate(dummy_device) == 0);
 
 	SECTION("single score terms are summed correctly") {
 		scorefxn += make_shared<DummyTerm>(10, 1);
-		CHECK(scorefxn.evaluate(dummy_construct) == Approx(10));
+		CHECK(scorefxn.evaluate(dummy_device) == Approx(10));
 	}
 
 	SECTION("multiple score terms are summed correctly") {
 		scorefxn += make_shared<DummyTerm>(10, 1);
 		scorefxn += make_shared<DummyTerm>(5, 1);
-		CHECK(scorefxn.evaluate(dummy_construct) == Approx(15));
+		CHECK(scorefxn.evaluate(dummy_device) == Approx(15));
 	}
 
 	SECTION("weights are applied correctly") {
 		scorefxn += make_shared<DummyTerm>(10, 1);
 		scorefxn += make_shared<DummyTerm>(10, 0.5);
-		CHECK(scorefxn.evaluate(dummy_construct) == Approx(15));
+		CHECK(scorefxn.evaluate(dummy_device) == Approx(15));
 	}
 }
 
 TEST_CASE("Test the 'macrostate prob' score term", "[scoring]") {
-	ConstructPtr dummy_construct = make_shared<Construct>("");
-	dummy_construct->add_macrostate("dummy", "");
+	DevicePtr dummy_device = make_shared<Device>("");
+	dummy_device->add_macrostate("dummy", "");
 
 	struct Test {
 		string name;
@@ -345,7 +345,7 @@ TEST_CASE("Test the 'macrostate prob' score term", "[scoring]") {
 		MacrostateProbTerm term(
 				"dummy", test.condition, test.favorable);
 		double score = term.evaluate(
-				dummy_construct, dummy_apo_fold, dummy_holo_fold);
+				dummy_device, dummy_apo_fold, dummy_holo_fold);
 
 		CHECK(term.name() == test.name);
 		CHECK(score == Approx(test.expected_score));

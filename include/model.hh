@@ -8,52 +8,57 @@
 
 namespace addapt {
 
-class Construct;
-using ConstructPtr = std::shared_ptr<Construct>;
-using ConstructConstPtr = std::shared_ptr<Construct const>;
+class Device;
+using DevicePtr = std::shared_ptr<Device>;
+using DeviceConstPtr = std::shared_ptr<Device const>;
 
 class Aptamer;
 using AptamerPtr = std::shared_ptr<Aptamer>;
 using AptamerConstPtr = std::shared_ptr<Aptamer const>;
 
-class Construct {
+struct Context;
+using ContextPtr = std::shared_ptr<Context>;
+using ContextConstPtr = std::shared_ptr<Context const>;
+
+class Device {
 
 public:
 
-	/// @brief Default constructor.
-	Construct(string);
+	/// @brief Default deviceor.
+	Device(string);
 
-	/// @brief Return the sequence of this construct.
+	/// @brief Return the sequence of this device.
 	string seq() const;
 
-	/// @brief Return the nucleotide at the given position of this construct.
+	/// @brief Return the nucleotide at the given position of this device.
 	char seq(int) const;
 
 	/// @brief Return constraints that define the given macrostate.
 	string macrostate(string) const;
 
-	/// @brief Return all the macrostates associated with this construct.
+	/// @brief Return all the macrostates associated with this device.
 	unordered_map<string,string> macrostates() const;
 
 	/// @brief Add constraints that define a particular macrostate.
 	void add_macrostate(string, string);
 
-	/// @brief Return the length of this construct.
+	/// @brief Return the length of this device.
 	int len() const;
 
-	/// @brief Make a point mutation in this construct.
+	/// @brief Make a point mutation in this device.
 	void mutate(int, char const);
 
-	/// @brief Return a deep-copy of this construct.
-	ConstructPtr copy() const;
+	/// @brief Return a deep-copy of this device.
+	DevicePtr copy() const;
 
-	/// @brief Make this construct equivalent to the given one.
-	void assign(ConstructPtr);
+	/// @brief Make this device equivalent to the given one.
+	void assign(DevicePtr);
 
 private:
 
 	string my_seq;
 	unordered_map<string,string> my_macrostates;
+	ContextPtr my_context;
 
 };
 
@@ -61,7 +66,7 @@ class Aptamer {
 
 public:
 
-	/// @brief Construct with a sequence, fold, and ΔG (kcal/mol).
+	/// @brief Device with a sequence, fold, and ΔG (kcal/mol).
 	Aptamer(string, string, double);
 
 	/// @brief Return the sequence of this aptamer.
@@ -81,6 +86,11 @@ private:
 	string my_fold;
 	double my_affinity;
 
+};
+
+struct Context {
+	string before;
+	string after;
 };
 
 

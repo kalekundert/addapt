@@ -38,23 +38,23 @@ find_section(vector<string> config_files, string name) {
 	return section;
 }
 
-ConstructPtr
-construct_from_yaml(vector<string> config_files) {
-	ConstructPtr construct;
+DevicePtr
+device_from_yaml(vector<string> config_files) {
+	DevicePtr device;
 
 	// Load the sequence.
 	YAML::Node seq_section = find_section(config_files, "sequence");
-	construct = make_shared<Construct>(seq_section.as<string>());
+	device = make_shared<Device>(seq_section.as<string>());
 
 	// Load any macrostates that are defined.
 	YAML::Node macro_section = find_section(config_files, "macrostates");
 	for(auto item: macro_section) {
-		construct->add_macrostate(
+		device->add_macrostate(
 				item.first.as<string>(),
 				item.second.as<string>());
 	}
 
-	return construct;
+	return device;
 }
 
 ScoreFunctionPtr

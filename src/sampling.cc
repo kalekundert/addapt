@@ -19,10 +19,10 @@ MonteCarlo::MonteCarlo():
 	my_moves(),
 	my_reporters() {}
 
-ConstructPtr
-MonteCarlo::apply(ConstructPtr construct, std::mt19937 &rng) const {
+DevicePtr
+MonteCarlo::apply(DevicePtr device, std::mt19937 &rng) const {
 	if (my_moves.empty()) {
-		return construct;
+		return device;
 	}
 
 	// Setup to data structure that will hold all the information about each 
@@ -30,14 +30,14 @@ MonteCarlo::apply(ConstructPtr construct, std::mt19937 &rng) const {
 	// methods and thermostats.
 	MonteCarloStep step;
 	step.num_steps = my_steps; step.i = -1;
-	step.current_construct = construct;
+	step.current_device = device;
 
 	// Create random number distributions for later use.
 	auto random = std::bind(std::uniform_real_distribution<>(), rng);
 	auto randmove = std::bind(std::uniform_int_distribution<>(0, my_moves.size()-1), rng);
 
 	// Get an initial score.
-	step.current_score = my_scorefxn->evaluate(step.current_construct, step.score_table);
+	step.current_score = my_scorefxn->evaluate(step.current_device, step.score_table);
 	step.proposed_score = step.current_score;
 
 	// Initialize the counters that will keep track of how often moves are 
@@ -59,20 +59,20 @@ MonteCarlo::apply(ConstructPtr construct, std::mt19937 &rng) const {
 		step.temperature = my_thermostat->adjust(step);
 
 		// Copy the sgRNA so we can easily undo the move.
-		step.proposed_construct = step.current_construct->copy();
+		step.proposed_device = step.current_device->copy();
 
 		// Randomly pick a move to apply.
 		step.move = my_moves[randmove()];
-		step.move->apply(step.proposed_construct, rng);
+		step.move->apply(step.proposed_device, rng);
 
 		// Skip the score function evaluation if the sequence didn't change.
-		if(step.current_construct->seq() == step.proposed_construct->seq()) {
+		if(step.current_device->seq() == step.proposed_device->seq()) {
 			step.outcome = OutcomeEnum::ACCEPT_UNCHANGED;
 		}
 
 		// Score the proposed move, then either accept or reject it.
 		else {
-			step.proposed_score = my_scorefxn->evaluate(step.proposed_construct, step.score_table);
+			step.proposed_score = my_scorefxn->evaluate(step.proposed_device, step.score_table);
 			step.score_diff = step.proposed_score - step.current_score;
 			step.metropolis_criterion = std::exp(step.score_diff / step.temperature);
 			step.random_threshold = random();
@@ -84,7 +84,7 @@ MonteCarlo::apply(ConstructPtr construct, std::mt19937 &rng) const {
 				step.outcome = (step.score_diff > 0)?
 					OutcomeEnum::ACCEPT_IMPROVED : OutcomeEnum::ACCEPT_WORSENED;
 
-				step.current_construct = step.proposed_construct;
+				step.current_device = step.proposed_device;
 				step.current_score = step.proposed_score;
 			}
 		}
@@ -103,7 +103,7 @@ MonteCarlo::apply(ConstructPtr construct, std::mt19937 &rng) const {
 		reporter->finish(step);
 	}
 
-	return step.current_construct;
+	return step.current_device;
 }
 
 int
@@ -168,22 +168,22 @@ MonteCarlo::operator+=(ReporterPtr reporter) {
 
 
 bool
-can_be_mutated(ConstructConstPtr construct, int position) {
+can_be_mutated(DeviceConstPtr device, int position) {
 	// Only mutate positions that are upper case.  This is a simple way for the 
 	// user to indicate which positions should be mutable.
-	return isupper(construct->seq()[position]);
+	return isupper(device->seq()[position]);
 }
 
 bool
-can_be_freely_mutated(ConstructConstPtr construct, int position) {
-	if(not can_be_mutated(construct, position)) {
+can_be_freely_mutated(DeviceConstPtr device, int position) {
+	if(not can_be_mutated(device, position)) {
 			return false;
 	}
 
 	// Don't mutate positions that are constrained to be the 3' end of a base 
 	// pair.  We don't want to over-sample these positions, and they'll be 
 	// mutated as a unit with their partner.
-	for(auto /*pair*/ macrostate: construct->macrostates()) {
+	for(auto /*pair*/ macrostate: device->macrostates()) {
 		if(macrostate.second[position] == ')') {
 			return false;
 		}
@@ -194,33 +194,33 @@ can_be_freely_mutated(ConstructConstPtr construct, int position) {
 
 void
 mutate_recursively(
-		ConstructPtr construct,
+		DevicePtr device,
 		int const position,
 		char const mutation) {
 
-	vector<bool> already_mutated(construct->len(), false);
-	mutate_recursively(construct, position, mutation, already_mutated);
+	vector<bool> already_mutated(device->len(), false);
+	mutate_recursively(device, position, mutation, already_mutated);
 }
 
 void
 mutate_recursively(
-		ConstructPtr construct,
+		DevicePtr device,
 		int const position,
 		char const mutation,
 		vector<bool> &already_mutated) {
 
-	assert(already_mutated.size() == construct->len());
+	assert(already_mutated.size() == device->len());
 	assert(not already_mutated[position]);
-	assert(can_be_mutated(construct, position));
+	assert(can_be_mutated(device, position));
 
-	// Make the indicated mutation to the construct.
-	construct->mutate(position, mutation);
+	// Make the indicated mutation to the device.
+	device->mutate(position, mutation);
 	already_mutated[position] = true;
 
 	// Recursively make complementary mutations in any position constrained to be 
 	// base paired to this one.  GU base pairs are not considered because they 
 	// would necessarily cause a bias in the final nucleotide distribution.
-	for(auto item: construct->macrostates()) {
+	for(auto item: device->macrostates()) {
 		string macrostate = item.second;
 		char open_symbol, close_symbol;
 		int step;
@@ -261,7 +261,7 @@ mutate_recursively(
 		}
 
 		// Make sure the partner is mutable.
-		if(not can_be_mutated(construct, partner)) {
+		if(not can_be_mutated(device, partner)) {
 			throw (f("position '%d' can be mutated, but it's base-paired to position '%d' which can't be.") % position % partner).str();
 		}
 
@@ -270,9 +270,9 @@ mutate_recursively(
 		char complementary_mutation = COMPLEMENTARY_NUCS.at(mutation);
 		if(not already_mutated[partner]) {
 			mutate_recursively(
-					construct, partner, complementary_mutation, already_mutated);
+					device, partner, complementary_mutation, already_mutated);
 		}
-		else if(construct->seq()[partner] != complementary_mutation) {
+		else if(device->seq()[partner] != complementary_mutation) {
 			// I can't think of a way to trigger this condition (programming errors 
 			// excluded), but I'm not yet convinced that there isn't a way.  If I 
 			// were, I would've made this an assertion rather than an exception.
@@ -285,11 +285,11 @@ mutate_recursively(
 UnbiasedMutationMove::UnbiasedMutationMove() {}
 
 void
-UnbiasedMutationMove::apply(ConstructPtr construct, std::mt19937 &rng) const {
+UnbiasedMutationMove::apply(DevicePtr device, std::mt19937 &rng) const {
 	// Make a list of the positions that can be mutated.
 	vector<int> mutable_positions;
-	for(int i = 0; i < construct->len(); i++) {
-		if(can_be_freely_mutated(construct, i)) {
+	for(int i = 0; i < device->len(); i++) {
+		if(can_be_freely_mutated(device, i)) {
 			mutable_positions.push_back(i);
 		}
 	}
@@ -299,7 +299,7 @@ UnbiasedMutationMove::apply(ConstructPtr construct, std::mt19937 &rng) const {
 		std::uniform_int_distribution<>(0, mutable_positions.size()-1)(rng)];
 	char random_acgu = "ACGU"[std::uniform_int_distribution<>(0, 3)(rng)];
 
-	mutate_recursively(construct, random_i, random_acgu);
+	mutate_recursively(device, random_i, random_acgu);
 }
 
 FixedThermostat::FixedThermostat(double temperature):
@@ -437,7 +437,7 @@ TsvTrajectoryReporter::start(MonteCarloStep const & step) {
 	// Record parameters that apply to the whole trajectory.  All the lines in 
 	// this section are prefixed with '#' so they won't be parsed by pandas as 
 	// part of the trajectory.  This is a hack.  It'd be better to use HDF5.
-	my_tsv << "#\t" << "initial_seq\t" << step.current_construct->seq() << "\n";
+	my_tsv << "#\t" << "initial_seq\t" << step.current_device->seq() << "\n";
 
 	// Write the column headers.
 	my_tsv << "step\t";
@@ -481,8 +481,8 @@ TsvTrajectoryReporter::update(MonteCarloStep const &step) {
 		my_tsv << step.random_threshold << "\t";
 		my_tsv << step.move->name() << "\t";
 		my_tsv << step.outcome << "\t";
-		my_tsv << step.current_construct->seq() << "\t";
-		my_tsv << step.proposed_construct->seq() << "\t";
+		my_tsv << step.current_device->seq() << "\t";
+		my_tsv << step.proposed_device->seq() << "\t";
 
 		my_tsv << std::endl;
 	}

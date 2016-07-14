@@ -30,11 +30,11 @@ class MonteCarlo {
 
 public:
 
-	/// @brief Default constructor.
+	/// @brief Default deviceor.
 	MonteCarlo();
 
 	/// @brief Perform the Monte Carlo design simulation.
-	ConstructPtr apply(ConstructPtr, std::mt19937 &) const;
+	DevicePtr apply(DevicePtr, std::mt19937 &) const;
 
 	/// @brief Return the number of moves that will be tried during the 
 	/// simulation.
@@ -94,7 +94,7 @@ enum class OutcomeEnum {
 
 struct MonteCarloStep {
 	int i, num_steps;
-	ConstructPtr current_construct, proposed_construct;
+	DevicePtr current_device, proposed_device;
 	MovePtr move;
 	EvaluatedScoreFunction score_table;
 	double current_score, proposed_score, score_diff;
@@ -108,16 +108,16 @@ map<char, char> const COMPLEMENTARY_NUCS = {
 	{'A','U'},{'G','C'},{'C','G'},{'U','A'}};
 
 bool
-can_be_mutated(ConstructConstPtr, int);
+can_be_mutated(DeviceConstPtr, int);
 
 bool
-can_be_freely_mutated(ConstructConstPtr, int);
+can_be_freely_mutated(DeviceConstPtr, int);
 
 void
-mutate_recursively(ConstructPtr, int const, char const);
+mutate_recursively(DevicePtr, int const, char const);
 
 void
-mutate_recursively(ConstructPtr, int const, char const, vector<bool> &);
+mutate_recursively(DevicePtr, int const, char const, vector<bool> &);
 
 
 class Move {
@@ -126,7 +126,7 @@ public:
 
 	virtual string name() const = 0;
 
-	virtual void apply(ConstructPtr, std::mt19937 &) const = 0;
+	virtual void apply(DevicePtr, std::mt19937 &) const = 0;
 
 };
 
@@ -138,7 +138,7 @@ public:
 
 	string name() const { return "UnbiasedMutation"; }
 
-	void apply(ConstructPtr, std::mt19937 &) const;
+	void apply(DevicePtr, std::mt19937 &) const;
 
 };
 

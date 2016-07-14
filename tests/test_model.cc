@@ -5,8 +5,8 @@
 using namespace std;
 using namespace addapt;
 
-TEST_CASE("Test the Construct class", "[model]") {
-	Construct dummy("ACGU");
+TEST_CASE("Test the Device class", "[model]") {
+	Device dummy("ACGU");
 	CHECK(dummy.seq() == "ACGU");
 	CHECK(dummy.len() == 4);
 
@@ -27,12 +27,12 @@ TEST_CASE("Test the Construct class", "[model]") {
 	CHECK(dummy.macrostate("a") == "....");
 	CHECK(dummy.macrostate("b") == "(())");
 
-	ConstructPtr dummy_2 = dummy.copy();
+	DevicePtr dummy_2 = dummy.copy();
 	CHECK(dummy_2->seq() == "ACGU");
 	CHECK(dummy_2->macrostate("a") == "....");
 	CHECK(dummy_2->macrostate("b") == "(())");
 
-	Construct dummy_3("nnnn");
+	Device dummy_3("nnnn");
 	CHECK(dummy_3.seq() == "nnnn");
 	dummy_3.assign(dummy_2);
 	CHECK(dummy_3.seq() == "ACGU");
@@ -40,8 +40,8 @@ TEST_CASE("Test the Construct class", "[model]") {
 	CHECK(dummy_3.macrostate("b") == "(())");
 }
 
-TEST_CASE("Test the Construct::mutate method", "[model]") {
-	Construct dummy("AAAA");
+TEST_CASE("Test the Device::mutate method", "[model]") {
+	Device dummy("AAAA");
 
 	SECTION("positive indices count from the front") {
 		dummy.mutate(0, 'U'); CHECK(dummy.seq() == "UAAA");

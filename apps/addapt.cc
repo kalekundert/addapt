@@ -61,8 +61,8 @@ int main(int argc, char **argv) {
 				USAGE+1, {argv + 1, argv + argc}, true, "0.0");
 		vector<string> config_files = args["<config>"].asStringList();
 		
-		// Create the construct.
-		ConstructPtr construct = construct_from_yaml(config_files);
+		// Create the device.
+		DevicePtr device = device_from_yaml(config_files);
 
 		// Create the score function.
 		ScoreFunctionPtr scorefxn = scorefxn_from_yaml(config_files);
@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
 		std::mt19937 rng(stoi(args["--random-seed"].asString()));
 
 		// Run the design simulation.
-		sampler->apply(construct, rng);
+		sampler->apply(device, rng);
 		return 0;
 	}
 	catch(YAML::Exception exc) {

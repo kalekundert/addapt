@@ -53,8 +53,8 @@ public:
 	/// with each other.
 	virtual double base_pair_prob(int, int) const = 0;
 
-	/// @brief Return the probability that the construct passed to the 
-	/// constructor will fold into the given macrostate, defined by a hard 
+	/// @brief Return the probability that the device passed to the 
+	/// deviceor will fold into the given macrostate, defined by a hard 
 	/// constraint string.
 	virtual double macrostate_prob(string) const = 0;
 
@@ -64,8 +64,8 @@ class ViennaRnaFold : public RnaFold {
 
 public:
 
-	/// @brief Predict how the construct will fold.
-	ViennaRnaFold(ConstructConstPtr, AptamerConstPtr=nullptr);
+	/// @brief Predict how the device will fold.
+	ViennaRnaFold(DeviceConstPtr, AptamerConstPtr=nullptr);
 
 	/// @brief Free the ViennaRNA data structures.
 	~ViennaRnaFold();
@@ -74,8 +74,8 @@ public:
 	/// with each other.
 	double base_pair_prob(int, int) const;
 
-	/// @brief Return the probability that the construct passed to the 
-	/// constructor will fold into the given macrostate, defined by a hard 
+	/// @brief Return the probability that the device passed to the 
+	/// deviceor will fold into the given macrostate, defined by a hard 
 	/// constraint string.
 	double macrostate_prob(string) const;
 
@@ -85,7 +85,7 @@ private:
 
 private:
 
-	ConstructConstPtr my_sgrna;
+	DeviceConstPtr my_sgrna;
 	AptamerConstPtr my_aptamer;
 
 	// We (used to) need to store our own copy of the sgRNA sequence to ensure 
@@ -105,15 +105,15 @@ class ScoreFunction {
 
 public:
 
-	/// @brief Default constructor.
+	/// @brief Default deviceor.
 	ScoreFunction();
 
-	/// @brief Calculate a score for the given construct.
-	double evaluate(ConstructConstPtr) const;
+	/// @brief Calculate a score for the given device.
+	double evaluate(DeviceConstPtr) const;
 
-	/// @brief Calculate a score for the given construct and fill in a table 
+	/// @brief Calculate a score for the given device and fill in a table 
 	/// containing the name, weight, and value of each score term.
-	virtual double evaluate(ConstructConstPtr, EvaluatedScoreFunction &) const;
+	virtual double evaluate(DeviceConstPtr, EvaluatedScoreFunction &) const;
 
 	/// @brief Add a term to this score function.
 	void add_term(ScoreTermPtr);
@@ -142,15 +142,15 @@ class VariedSpacerScoreFunction : public ScoreFunction {
 
 public:
 
-	/// @brief Default constructor.
+	/// @brief Default deviceor.
 	VariedSpacerScoreFunction();
 
-	/// @brief Constructor that accepts a list of spacer sequences.
+	/// @brief Deviceor that accepts a list of spacer sequences.
 	VariedSpacerScoreFunction(vector<string>);
 
-	/// @brief Calculate a score for the given construct and fill in a table 
+	/// @brief Calculate a score for the given device and fill in a table 
 	/// containing the name, weight, and value of each score term.
-	virtual double evaluate(ConstructConstPtr, EvaluatedScoreFunction &) const;
+	virtual double evaluate(DeviceConstPtr, EvaluatedScoreFunction &) const;
 
 	/// @brief Return the spacer sequences being used by this score function.
 	vector<string> spacers() const;
@@ -184,7 +184,7 @@ public:
 
 	/// @brief Calculate an unweighted value for this score term.
 	virtual double evaluate(
-			ConstructConstPtr, RnaFold const &, RnaFold const &) const = 0;
+			DeviceConstPtr, RnaFold const &, RnaFold const &) const = 0;
 
 	/// @brief Return this score term's name.
 	string name() const;
@@ -213,9 +213,9 @@ public:
 	/// indication of whether or not we want that fold in that condition.
 	MacrostateProbTerm(string, ConditionEnum, FavorableEnum=FavorableEnum::YES);
 
-	/// @brief Calculate the log probability that the given construct adopts the 
+	/// @brief Calculate the log probability that the given device adopts the 
 	/// given fold in the given condition.
-	double evaluate(ConstructConstPtr, RnaFold const &, RnaFold const &) const;
+	double evaluate(DeviceConstPtr, RnaFold const &, RnaFold const &) const;
 
 private:
 		string my_macrostate;

@@ -10,8 +10,8 @@ namespace addapt {
 YAML::Node
 find_section(vector<string> config_files, string name);
 
-ConstructPtr
-construct_from_yaml(vector<string> config_files);
+DevicePtr
+device_from_yaml(vector<string> config_files);
 
 ScoreFunctionPtr
 scorefxn_from_yaml(vector<string> config_files);

@@ -74,7 +74,7 @@ enum class FavorWtEnum {
 };
 
 
-ConstructPtr
+DevicePtr
 build_mh_sgrna(int ruler_len, vector<string> &mutable_domains) {
 	ColorEnum GREEN = ColorEnum::GREEN;
 	ColorEnum RED = ColorEnum::RED;
@@ -95,7 +95,7 @@ build_mh_sgrna(int ruler_len, vector<string> &mutable_domains) {
 	}
 	string ruler_cst(ruler_seq.length(), 'x');
 
-	ConstructPtr sgrna = make_shared<Construct>();
+	DevicePtr sgrna = make_shared<Device>();
 
 	*sgrna += make_shared<Domain>("spacer", "");
 	*sgrna += make_shared<Domain>("lower_stem/a", "guuuua", "(.....", GREEN);
@@ -127,7 +127,7 @@ build_mh_sgrna(int ruler_len, vector<string> &mutable_domains) {
 
 ScoreFunctionPtr
 build_mh_scorefxn(
-		ConstructConstPtr wt,
+		DeviceConstPtr wt,
 		vector<string> mutable_domains,
 		vector<string> spacers,
 		ScorefxnEnum style=ScorefxnEnum::ACTIVE,
@@ -230,7 +230,7 @@ build_mh_scorefxn(
 }
 
 MonteCarloPtr
-build_mh_sampler(ConstructConstPtr wt, vector<string> mutable_domains) {
+build_mh_sampler(DeviceConstPtr wt, vector<string> mutable_domains) {
 	MonteCarloPtr sampler = make_shared<MonteCarlo>();
 	
 	*sampler += make_shared<AutoPointMutation>();
@@ -256,9 +256,9 @@ int main(int argc, char **argv) {
         "GGGTGGGGGGAGTTTGCTCC"  // vegfa
 		};
 
-		ConstructPtr mh = build_mh_sgrna(
+		DevicePtr mh = build_mh_sgrna(
 				stoi(args["--ruler-len"].asString()), mutable_domains);
-		ConstructPtr wt = mh->copy();
+		DevicePtr wt = mh->copy();
 		ScoreFunctionPtr scorefxn = build_mh_scorefxn(
 				wt, mutable_domains, {});
 		MonteCarloPtr sampler = build_mh_sampler(wt, mutable_domains);

@@ -14,7 +14,7 @@ extern "C" {
 
 namespace addapt {
 
-ViennaRnaFold::ViennaRnaFold(ConstructConstPtr sgrna, AptamerConstPtr aptamer):
+ViennaRnaFold::ViennaRnaFold(DeviceConstPtr sgrna, AptamerConstPtr aptamer):
 
 	my_sgrna(sgrna),
 	my_aptamer(aptamer),
@@ -64,7 +64,7 @@ ViennaRnaFold::macrostate_prob(string constraint) const {
 	// Calculate the free energy for the given macrostate.
 	double g_active = vrna_pf(fc, NULL);
 
-	// Return the probability that the construct will be in the given macrostate 
+	// Return the probability that the device will be in the given macrostate 
 	// at equilibrium.
 	double kT = fc->exp_params->kT / 1000;
 	return exp((g_tot - g_active) / kT);
@@ -103,14 +103,14 @@ ViennaRnaFold::make_fold_compound(bool compute_bppm) const {
 ScoreFunction::ScoreFunction() {}
 
 double
-ScoreFunction::evaluate(ConstructConstPtr sgrna) const {
+ScoreFunction::evaluate(DeviceConstPtr sgrna) const {
 	EvaluatedScoreFunction table;
 	return evaluate(sgrna, table);
 }
 		
 double
 ScoreFunction::evaluate(
-		ConstructConstPtr sgrna,
+		DeviceConstPtr sgrna,
 		EvaluatedScoreFunction &table) const {
 
 	ViennaRnaFold apo_fold(sgrna);
@@ -158,7 +158,7 @@ VariedSpacerScoreFunction::VariedSpacerScoreFunction(
 
 double
 VariedSpacerScoreFunction::evaluate(
-		ConstructConstPtr sgrna,
+		DeviceConstPtr sgrna,
 		EvaluatedScoreFunction &table) const {
 
 	double score = 0;
@@ -172,7 +172,7 @@ VariedSpacerScoreFunction::evaluate(
 	table.clear();
 	/*
 	for(string spacer: my_spacers) {
-		ConstructPtr sgrna_i = sgrna->copy();
+		DevicePtr sgrna_i = sgrna->copy();
 		EvaluatedScoreFunction table_i;
 
 		sgrna_i->domain("spacer")->seq(spacer);
@@ -256,7 +256,7 @@ MacrostateProbTerm::MacrostateProbTerm(
 
 double
 MacrostateProbTerm::evaluate(
-		ConstructConstPtr sgrna,
+		DeviceConstPtr sgrna,
 		RnaFold const &apo_fold,
 		RnaFold const &holo_fold) const {
 
