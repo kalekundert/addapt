@@ -130,6 +130,16 @@ ScoreFunction::evaluate(
 	return score;
 }
 
+void 
+ScoreFunction::add_term(ScoreTermPtr term) {
+	my_terms.push_back(term);
+}
+
+void 
+ScoreFunction::operator+=(ScoreTermPtr term) {
+	add_term(term);
+}
+
 AptamerConstPtr
 ScoreFunction::aptamer() const {
 	return my_aptamer;
@@ -140,14 +150,14 @@ ScoreFunction::aptamer(AptamerConstPtr aptamer) {
 	my_aptamer = aptamer;
 }
 
-void 
-ScoreFunction::add_term(ScoreTermPtr term) {
-	my_terms.push_back(term);
+ContextConstPtr
+ScoreFunction::context(string name) const {
+	return my_contexts.at(name);
 }
 
 void 
-ScoreFunction::operator+=(ScoreTermPtr term) {
-	add_term(term);
+ScoreFunction::add_context(string name, ContextConstPtr context) {
+	my_contexts[name] = context;
 }
 
 

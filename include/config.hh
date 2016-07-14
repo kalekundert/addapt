@@ -7,23 +7,20 @@
 
 namespace addapt {
 
-YAML::Node
-find_section(vector<string> config_files, string name);
-
 DevicePtr
-device_from_yaml(vector<string> config_files);
+device_from_yaml(vector<string>);
 
 ScoreFunctionPtr
-scorefxn_from_yaml(vector<string> config_files);
+scorefxn_from_yaml(vector<string>);
 
 ScoreTermPtr
-score_term_from_str(ConditionEnum condition, string spec);
+score_term_from_str(ConditionEnum, string);
 
 ThermostatPtr
-thermostat_from_yaml(vector<string> config_files);
+thermostat_from_yaml(vector<string>);
 
 ThermostatPtr
-thermostat_from_str(string spec);
+thermostat_from_str(string);
 
 
 }

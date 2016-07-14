@@ -13,8 +13,19 @@ namespace addapt {
 using std::stod;
 using std::stoi;
 
+enum class OptionalEnum {
+	REQUIRED,
+	OPTIONAL
+};
+OptionalEnum const REQUIRED = OptionalEnum::REQUIRED;
+OptionalEnum const OPTIONAL = OptionalEnum::OPTIONAL;
+
 YAML::Node
-find_section(vector<string> config_files, string name) {
+find_section(
+		vector<string> config_files,
+		string name,
+		OptionalEnum optional=REQUIRED) {
+
 	YAML::Node section;
 	bool section_found = false;
 
@@ -31,12 +42,13 @@ find_section(vector<string> config_files, string name) {
 		}
 	}
 
-	if(not section_found) {
+	if(not section_found and optional == OptionalEnum::REQUIRED) {
 		throw (f("no '%s' configuration") % name).str();
 	}
 
 	return section;
 }
+
 
 DevicePtr
 device_from_yaml(vector<string> config_files) {
@@ -75,8 +87,18 @@ scorefxn_from_yaml(vector<string> config_files) {
 			apt_section["fold"].as<string>(),
 			stod(apt_section["affinity"].as<string>())));
 
+	// Load any contexts that are defined.
+	YAML::Node con_section = find_section(config_files, "contexts", OPTIONAL);
+	for(auto item: con_section) {
+		scorefxn->add_context(
+				item.first.as<string>(),
+				make_shared<Context>(
+					item.second[0].as<string>(),
+					item.second[1].as<string>()));
+	}
+
 	return scorefxn;
-}
+};
 
 ScoreTermPtr
 score_term_from_str(ConditionEnum condition, string spec) {
@@ -94,8 +116,8 @@ score_term_from_str(ConditionEnum condition, string spec) {
 
 ThermostatPtr
 thermostat_from_yaml(vector<string> config_files) {
-	YAML::Node section = find_section(config_files, "thermostat");
-	return thermostat_from_str(section.as<string>());
+	YAML::Node section = find_section(config_files, "thermostat", OPTIONAL);
+	return thermostat_from_str(section? section.as<string>() : "1");
 }
 
 ThermostatPtr

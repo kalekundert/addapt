@@ -28,11 +28,6 @@ class ScoreTerm;
 using ScoreTermPtr = std::shared_ptr<ScoreTerm>;
 using ScoreTermList = std::vector<ScoreTermPtr>;
 
-enum class LigandEnum {
-	NONE,
-	THEO,
-};
-
 enum class ConditionEnum {
 	APO,
 	HOLO,
@@ -127,9 +122,16 @@ public:
 	/// @brief Set the aptamer being used by this score function.
 	void aptamer(AptamerConstPtr);
 
+	/// @brief Return the context with the given name.
+	ContextConstPtr context(string) const;
+
+	/// @brief Add a context to this score function with the given name.
+	void add_context(string, ContextConstPtr);
+
 private:
 	ScoreTermList my_terms;
 	AptamerConstPtr my_aptamer;
+	map<string,ContextConstPtr> my_contexts;
 
 };
 
