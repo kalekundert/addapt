@@ -38,7 +38,6 @@ enum class FavorableEnum {
 	YES,
 };
 
-
 /// @brief The interface to RNA secondary structure predictions.
 class RnaFold {
 
@@ -80,7 +79,7 @@ private:
 
 private:
 
-	DeviceConstPtr my_sgrna;
+	DeviceConstPtr my_device;
 	AptamerConstPtr my_aptamer;
 
 	// We (used to) need to store our own copy of the sgRNA sequence to ensure 
@@ -95,12 +94,11 @@ private:
 	mutable vrna_fold_compound_t *my_bppm_fc;
 };
 
-
 class ScoreFunction {
 
 public:
 
-	/// @brief Default deviceor.
+	/// @brief Default constructor.
 	ScoreFunction();
 
 	/// @brief Calculate a score for the given device.
@@ -128,6 +126,17 @@ public:
 	/// @brief Add a context to this score function with the given name.
 	void add_context(string, ContextConstPtr);
 
+protected:
+
+	/// @brief Evaluate the score terms associated with this function.  This 
+	/// helps the public evaluate() method support contexts.
+	double evaluate_terms(
+			DeviceConstPtr,
+			RnaFold const &,
+			RnaFold const &,
+			EvaluatedScoreFunction &,
+			string="") const;
+
 private:
 	ScoreTermList my_terms;
 	AptamerConstPtr my_aptamer;
@@ -135,53 +144,11 @@ private:
 
 };
 
-/// @brief Calculate a score in the context of several different spacer 
-/// sequences and return the average.
-///
-/// @details The purpose of this score function is to find sequences that are 
-/// somehow robust to changes in the spacer sequence.
-class VariedSpacerScoreFunction : public ScoreFunction {
-
-public:
-
-	/// @brief Default deviceor.
-	VariedSpacerScoreFunction();
-
-	/// @brief Deviceor that accepts a list of spacer sequences.
-	VariedSpacerScoreFunction(vector<string>);
-
-	/// @brief Calculate a score for the given device and fill in a table 
-	/// containing the name, weight, and value of each score term.
-	virtual double evaluate(DeviceConstPtr, EvaluatedScoreFunction &) const;
-
-	/// @brief Return the spacer sequences being used by this score function.
-	vector<string> spacers() const;
-
-	/// @brief Set the spacer sequences that will be used by this score function.
-	void spacers(vector<string>);
-
-	/// @brief Add a spacer sequence to those being considered by this score 
-	/// function.
-	void add_spacer(string);
-
-	/// @brief Add a spacer sequence to those being considered by this score 
-	/// function.
-	void operator+=(string);
-
-private:
-
-	/// @brief A list of spacer sequences.  The sequences in this list should 
-	/// each be 20 nucleotides long, but this is not checked.
-	vector<string> my_spacers;
-
-};
-
-
 class ScoreTerm {
 
 public:
 
-	/// @brief Optionally initialize the score term with a name and a weight.
+	/// @brief Optionally initialize with a name and a weight.
 	ScoreTerm(string="", double=1.0);
 
 	/// @brief Calculate an unweighted value for this score term.

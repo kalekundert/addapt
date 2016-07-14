@@ -42,6 +42,11 @@ private:
 
 };
 
+AptamerConstPtr THEO_APTAMER = make_shared<Aptamer>(
+  "GAUACCAGCCGAAAGGCCCUUGGCAGC",
+  "(...((.(((....)))....))...)",
+  0.32);
+
 DeviceConstPtr
 build_rhf_6_device() {
 	// 0....,....1....,....2....,....3....,....4....,....5....,....6....,....7....,....8....,....9....,....0.
@@ -57,10 +62,6 @@ build_rhf_6_device() {
 	return rhf_6;
 }
 
-AptamerConstPtr THEO_APTAMER = make_shared<Aptamer>(
-  "GAUACCAGCCGAAAGGCCCUUGGCAGC",
-  "(...((.(((....)))....))...)",
-  0.32);
 
 TEST_CASE("Test the DummyRnaFold helper class") {
 	DummyRnaFold fold;
@@ -278,7 +279,7 @@ TEST_CASE("Test the score function class", "[scoring]") {
 
 	};
 
-	CHECK(scorefxn.evaluate(dummy_device) == 0);
+	CHECK(scorefxn.evaluate(dummy_device) == Approx(0));
 
 	SECTION("single score terms are summed correctly") {
 		scorefxn += make_shared<DummyTerm>(10, 1);
@@ -295,6 +296,36 @@ TEST_CASE("Test the score function class", "[scoring]") {
 		scorefxn += make_shared<DummyTerm>(10, 1);
 		scorefxn += make_shared<DummyTerm>(10, 0.5);
 		CHECK(scorefxn.evaluate(dummy_device) == Approx(15));
+	}
+}
+
+TEST_CASE("Test the score function class with contexts", "[scoring]") {
+	ScoreFunction scorefxn;
+	DevicePtr dummy_device = make_shared<Device>("U");
+
+	class DummyTerm : public ScoreTerm {
+
+	public:
+
+		double
+		evaluate(DeviceConstPtr device, RnaFold const &, RnaFold const &) const {
+			return device->len();
+		}
+
+	};
+	scorefxn += make_shared<DummyTerm>();
+
+	SECTION("the score function depends on the context") {
+		CHECK(scorefxn.evaluate(dummy_device) == Approx(1.0));
+
+		scorefxn.add_context("1", make_shared<Context>("a", ""));
+		CHECK(scorefxn.evaluate(dummy_device) == Approx(2.0));
+
+		scorefxn.add_context("2", make_shared<Context>("a", "a"));
+		CHECK(scorefxn.evaluate(dummy_device) == Approx(5.0));
+
+		scorefxn.add_context("3", make_shared<Context>("a", "aa"));
+		CHECK(scorefxn.evaluate(dummy_device) == Approx(9.0));
 	}
 }
 

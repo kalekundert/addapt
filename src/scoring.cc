@@ -14,11 +14,11 @@ extern "C" {
 
 namespace addapt {
 
-ViennaRnaFold::ViennaRnaFold(DeviceConstPtr sgrna, AptamerConstPtr aptamer):
+ViennaRnaFold::ViennaRnaFold(DeviceConstPtr device, AptamerConstPtr aptamer):
 
-	my_sgrna(sgrna),
+	my_device(device),
 	my_aptamer(aptamer),
-	my_seq(sgrna->seq()),
+	my_seq(device->seq()),
 	my_bppm_fc(nullptr) {
 
 	// Upper-casing the sequence is critically important!  Without this step, 
@@ -103,28 +103,55 @@ ViennaRnaFold::make_fold_compound(bool compute_bppm) const {
 ScoreFunction::ScoreFunction() {}
 
 double
-ScoreFunction::evaluate(DeviceConstPtr sgrna) const {
+ScoreFunction::evaluate(DeviceConstPtr device) const {
 	EvaluatedScoreFunction table;
-	return evaluate(sgrna, table);
+	return evaluate(device, table);
 }
 		
 double
 ScoreFunction::evaluate(
-		DeviceConstPtr sgrna,
+		DeviceConstPtr device,
 		EvaluatedScoreFunction &table) const {
 
-	ViennaRnaFold apo_fold(sgrna);
-	ViennaRnaFold holo_fold(sgrna, my_aptamer);
+	ViennaRnaFold apo_fold(device);
+	ViennaRnaFold holo_fold(device, my_aptamer);
 
 	double score = 0;
-	double evaluated_term;
 
 	table.clear();
 
+	if(my_contexts.empty()) {
+		score += evaluate_terms(device, apo_fold, holo_fold, table);
+	}
+	else {
+		DevicePtr scratch_device = device->copy();
+		for(auto context: my_contexts) {
+			scratch_device->context(context.second);
+			score += evaluate_terms(
+					scratch_device, apo_fold, holo_fold, table, context.first + ": ");
+		}
+	}
+
+	return score;
+}
+
+double
+ScoreFunction::evaluate_terms(
+		DeviceConstPtr device,
+		RnaFold const &apo_fold,
+		RnaFold const &holo_fold,
+		EvaluatedScoreFunction &table,
+		string term_prefix) const {
+
+	double score = 0;
+
 	for(ScoreTermPtr term: my_terms) {
-		evaluated_term = term->evaluate(sgrna, apo_fold, holo_fold);
-		score += term->weight() * evaluated_term;
-		table.push_back({term->name(), term->weight(), evaluated_term});
+		EvaluatedScoreTerm eval;
+		eval.name = term_prefix + term->name();
+		eval.weight = term->weight();
+		eval.term = term->evaluate(device, apo_fold, holo_fold);
+		table.push_back(eval);
+		score += eval.weight * eval.term;
 	}
 
 	return score;
@@ -158,67 +185,6 @@ ScoreFunction::context(string name) const {
 void 
 ScoreFunction::add_context(string name, ContextConstPtr context) {
 	my_contexts[name] = context;
-}
-
-
-VariedSpacerScoreFunction::VariedSpacerScoreFunction() {}
-
-VariedSpacerScoreFunction::VariedSpacerScoreFunction(
-		vector<string> spacers): my_spacers(spacers) {}
-
-double
-VariedSpacerScoreFunction::evaluate(
-		DeviceConstPtr sgrna,
-		EvaluatedScoreFunction &table) const {
-
-	double score = 0;
-	int N = my_spacers.size();
-
-	// Return 0 if no spacers where specified.  Maybe this should throw, but my 
-	// instinct is that it's better to return a sensible value.
-	if(N == 0) { return 0; }
-	
-	// Score the sgRNA with all the spacers this score function knows about.
-	table.clear();
-	/*
-	for(string spacer: my_spacers) {
-		DevicePtr sgrna_i = sgrna->copy();
-		EvaluatedScoreFunction table_i;
-
-		sgrna_i->domain("spacer")->seq(spacer);
-		score += ScoreFunction::evaluate(sgrna_i, table_i);
-
-		// Copy the score table entries into the "real" score table.
-		for(auto &row: table_i) {
-			row.name = spacer + ": " + row.name;
-			row.term /= N;
-			table.push_back(row);
-		}
-	}
-	*/
-
-	// Normalize the score by the number of spacers.
-	return score / N;
-}
-
-vector<string>
-VariedSpacerScoreFunction::spacers() const {
-	return my_spacers;
-}
-
-void
-VariedSpacerScoreFunction::spacers(vector<string> spacers) {
-	my_spacers = spacers;
-}
-
-void
-VariedSpacerScoreFunction::add_spacer(string spacer) {
-	my_spacers.push_back(spacer);
-}
-
-void
-VariedSpacerScoreFunction::operator+=(string spacer) {
-	add_spacer(spacer);
 }
 
 
@@ -266,7 +232,7 @@ MacrostateProbTerm::MacrostateProbTerm(
 
 double
 MacrostateProbTerm::evaluate(
-		DeviceConstPtr sgrna,
+		DeviceConstPtr device,
 		RnaFold const &apo_fold,
 		RnaFold const &holo_fold) const {
 
@@ -278,7 +244,7 @@ MacrostateProbTerm::evaluate(
 	}
 
 	// Calculate the probability of adopting this fold in this condition.
-	string constraint = sgrna->macrostate(my_macrostate);
+	string constraint = device->macrostate(my_macrostate);
 	double macrostate_prob = apropos_fold->macrostate_prob(constraint);
 
 	// Invert the probability if we want to avoid this fold in this condition.
