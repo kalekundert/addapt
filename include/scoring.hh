@@ -132,8 +132,6 @@ protected:
 	/// helps the public evaluate() method support contexts.
 	double evaluate_terms(
 			DeviceConstPtr,
-			RnaFold const &,
-			RnaFold const &,
 			EvaluatedScoreFunction &,
 			string="") const;
 

@@ -72,6 +72,9 @@ ViennaRnaFold::macrostate_prob(string constraint) const {
 
 vrna_fold_compound_t *
 ViennaRnaFold::make_fold_compound(bool compute_bppm) const {
+	// Make sure the device hasn't changed since this engine was created.
+	assert(my_device->len() == my_seq.length());
+
 	// Tell ViennaRNA not to calculate the base-pair probability matrix (BPPM) if 
 	// we won't be using it.
 	vrna_md_t md;
@@ -113,22 +116,18 @@ ScoreFunction::evaluate(
 		DeviceConstPtr device,
 		EvaluatedScoreFunction &table) const {
 
-	ViennaRnaFold apo_fold(device);
-	ViennaRnaFold holo_fold(device, my_aptamer);
-
 	double score = 0;
 
 	table.clear();
 
 	if(my_contexts.empty()) {
-		score += evaluate_terms(device, apo_fold, holo_fold, table);
+		score += evaluate_terms(device, table);
 	}
 	else {
 		DevicePtr scratch_device = device->copy();
 		for(auto context: my_contexts) {
 			scratch_device->context(context.second);
-			score += evaluate_terms(
-					scratch_device, apo_fold, holo_fold, table, context.first + ": ");
+			score += evaluate_terms(scratch_device, table, context.first + ": ");
 		}
 	}
 
@@ -138,12 +137,13 @@ ScoreFunction::evaluate(
 double
 ScoreFunction::evaluate_terms(
 		DeviceConstPtr device,
-		RnaFold const &apo_fold,
-		RnaFold const &holo_fold,
 		EvaluatedScoreFunction &table,
 		string term_prefix) const {
 
 	double score = 0;
+
+	ViennaRnaFold apo_fold(device);
+	ViennaRnaFold holo_fold(device, my_aptamer);
 
 	for(ScoreTermPtr term: my_terms) {
 		EvaluatedScoreTerm eval;
