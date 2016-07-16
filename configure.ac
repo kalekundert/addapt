@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([addapt], [1.0.0], [kale.kundert@ucsf.edu])
+AC_INIT([addapt], [1.1.0-develop], [kale.kundert@ucsf.edu])
 AC_CONFIG_AUX_DIR([build/aux])
 AC_CONFIG_MACRO_DIR([build/m4])
 AC_CONFIG_FILES([Makefile])
