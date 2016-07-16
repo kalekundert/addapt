@@ -220,6 +220,25 @@ private:
 
 };
 
+class AutoAnnealingThermostat : public Thermostat {
+
+public:
+
+	AutoAnnealingThermostat(int, double, double, double=1.0, double=0.0);
+
+	double adjust(MonteCarloStep const &);
+
+private:
+
+	int my_cycle_len;
+	double my_high_acceptance_rate, my_low_acceptance_rate;
+	double my_initial_high_temperature, my_initial_low_temperature;
+	double my_sum_score_diffs;
+	int my_num_score_diffs;
+	double my_high_temperature, my_low_temperature;
+
+};
+
 
 class Reporter {
 

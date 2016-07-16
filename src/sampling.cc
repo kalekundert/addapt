@@ -411,6 +411,49 @@ AutoScalingThermostat::training_period(unsigned value) {
 }
 
 
+AutoAnnealingThermostat::AutoAnnealingThermostat(
+		int cycle_len,
+		double high_acceptance_rate,
+		double low_acceptance_rate,
+		double initial_high_temperature,
+		double initial_low_temperature):
+
+	my_cycle_len(cycle_len),
+	my_high_acceptance_rate(high_acceptance_rate),
+	my_low_acceptance_rate(low_acceptance_rate),
+	my_initial_high_temperature(initial_high_temperature),
+	my_initial_low_temperature(initial_low_temperature),
+	my_sum_score_diffs(0),
+	my_num_score_diffs(0) {}
+
+double
+AutoAnnealingThermostat::adjust(MonteCarloStep const &step) {
+	// Add the new score difference to the training set.
+	my_sum_score_diffs += step.score_diff;
+	my_num_score_diffs += 1;
+
+	// Recalculate the high and low temperatures at the beginning of each cycle.
+	if(step.i == 0) {
+		my_high_temperature = my_initial_high_temperature;
+		my_low_temperature = my_initial_low_temperature;
+	}
+	else if(step.i % my_cycle_len == 0) {
+		double mean_score_diff = my_sum_score_diffs / my_num_score_diffs;
+		my_high_temperature = (my_high_acceptance_rate > 0.0)?
+			std::max(mean_score_diff / log(my_high_acceptance_rate), 0.0) : 0.0;
+		my_low_temperature = (my_low_acceptance_rate > 0.0)?
+			std::max(mean_score_diff / log(my_low_acceptance_rate), 0.0) : 0.0;
+	}
+
+	// Gradually decrease the temperature over the course of the cycle.
+	int N = my_cycle_len;
+	int i = step.i;
+	double T_hi = my_high_temperature;
+	double T_lo = my_low_temperature;
+	return ((T_lo - T_hi) / N) * (i % N) + T_hi;
+}
+
+
 void
 ProgressReporter::update(MonteCarloStep const &step) {
 	// Print a progress bar if the program is running in a TTY.

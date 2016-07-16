@@ -148,6 +148,15 @@ thermostat_from_str(string spec) {
 				")?"
 			")?"
 	);
+	std::regex auto_annealing_pattern(
+			"([0-9.e+-]+)%"     // A percentage (the high acceptance rate).
+			" to "
+			"([0-9.e+-]+)%"     // A percentage (the low acceptance rate).
+			" in "
+			"([0-9]+)"          // An integer (the number of steps per cycle).
+			" steps"
+	);
+
 
 	std::smatch match;
 
@@ -169,6 +178,14 @@ thermostat_from_str(string spec) {
 		double initial_temp = stod(match[3].length()? match[3].str() : "1");
 		return make_shared<AutoScalingThermostat>(
 				accept_rate, training_period, initial_temp);
+	}
+
+	if(std::regex_match(spec, match, auto_annealing_pattern)) {
+		double high_rate = stod(match[1]) / 100;
+		double low_rate = stod(match[2]) / 100;
+		int cycle_len = stoi(match[3]);
+		return make_shared<AutoAnnealingThermostat>(
+				cycle_len, high_rate, low_rate);
 	}
 
 	throw (f("can't make a thermostat from '%s'") % spec).str();
