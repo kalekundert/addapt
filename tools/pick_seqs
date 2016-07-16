@@ -2,7 +2,7 @@
 
 """\
 Usage:
-    pick_seqs [<trajectories>...] [options]
+    pick_seqs [<trajectories>...] [-v]... [options]
 
 Options:
     -w --window <steps>     [default: 500]
@@ -10,13 +10,15 @@ Options:
         probably be about the auto-correlation time, to ensure that the picked 
         sequences are independent.
 
-    -q --header-only
-        Only print out the header information summarizing the picks, don't 
-        print out all the picks themselves.
+    -v --verbose
+        Display extra information about the picks.  If specified once, the 
+        sequence and score for each pick will be displayed.  If specified a 
+        second time, the scores will be broken down term by term and secondary 
+        structure predictions will be made.
 
-    -v --explain-scores
-        Explain why each picked sequence scored as well as it did by printing 
-        out the individual score terms and 2° structure predictions for each.
+    -s --sort
+        If displaying individual sequences (i.e. with either -v or -vv), sort 
+        the sequences by score rather than by chronology.
 """
 
 import docopt, utils, statistics
@@ -38,31 +40,32 @@ print("Worst Score: {:.4f}".format(min(best_scores)))
 print("Average Score: {:.4f} ± {:.4f}".format(
     statistics.mean(best_scores), statistics.stdev(best_scores)))
 
-if args['--header-only']:
-    raise SystemExit
-
-print()
-
-for pick in best_seqs:
-    print('Step:', pick.i)
-    print('Seq:', pick.seq)
-    print('Score:', pick.score)
-
-    if args['--explain-scores']:
-        print('Score Terms:')
-        table = []
-        for col in pick.traj.columns:
-            if col.startswith('term_value'):
-                key = col[11:-1]
-                weight = pick.traj['term_weight[%s]' % key][pick.i]
-                value = pick.traj[col][pick.i]
-                table.append((key, weight * value))
-        table.sort(key=lambda x: x[1], reverse=True)
-        print(indent(tabulate(table, tablefmt='plain', floatfmt='.4f'), '  '))
-        print("Apo Fold:")
-        print(indent(utils.run_rnafold(pick.seq, theo=False), '  '))
-        print("Holo Fold:")
-        print(indent(utils.run_rnafold(pick.seq, theo=True), '  '))
-
+if args['--verbose'] >= 1:
     print()
+
+    if args['--sort']:
+        best_seqs.sort(key=lambda x: x.score, reverse=True)
+
+    for pick in best_seqs:
+        print('Step:', pick.i)
+        print('Seq:', pick.seq)
+        print('Score:', pick.score)
+
+        if args['--verbose'] >= 2:
+            print('Score Terms:')
+            table = []
+            for col in pick.traj.columns:
+                if col.startswith('term_value'):
+                    key = col[11:-1]
+                    weight = pick.traj['term_weight[%s]' % key][pick.i]
+                    value = pick.traj[col][pick.i]
+                    table.append((key, weight * value))
+            table.sort(key=lambda x: x[1], reverse=True)
+            print(indent(tabulate(table, tablefmt='plain', floatfmt='.4f'), '  '))
+            print("Apo Fold:")
+            print(indent(utils.run_rnafold(pick.seq, theo=False), '  '))
+            print("Holo Fold:")
+            print(indent(utils.run_rnafold(pick.seq, theo=True), '  '))
+
+        print()
         

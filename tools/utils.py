@@ -57,13 +57,7 @@ def extract_pick(traj, i):
     pick.i = i
     pick.traj = traj
     pick.score = traj['current_score'][i]
-
-    pick.seq = ''
-    for col in traj.columns:
-        if col.startswith('current_domain'):
-            domain_seq = traj[col][i]
-            if isinstance(domain_seq, str):
-                pick.seq += domain_seq
+    pick.seq = traj['current_seq'][i]
 
     return pick
 

@@ -5,12 +5,20 @@ Usage:
     auto_corr.py [<trajectory>] [options]
 
 Options:
-    -n --steps <steps>      [default: 500]
+    -w --window <steps>      [default: 500]
         Calculate the auto-correlation for the given number of steps.
+
+    -s --stride <steps>     [default: 10]
+        The number of steps to skip between each measurement.  This can 
+        dramatically speed up to calculation of long correlation times.
 
     -d --discard <steps>    [default: 100]
         Throw out the given number of steps from the beginning of the 
         simulation to account for equilibration.
+
+    -o --output <path>
+        Save the auto-correlation plot to the given path instead of showing it 
+        in the GUI.
 """
 
 import docopt, utils, tango
@@ -23,37 +31,54 @@ if fork(): raise SystemExit
 args = docopt.docopt(__doc__)
 traj = utils.load_trajectory(args['<trajectory>'])
 traj_name = args['<trajectory>'] or 'logs/mh.tsv'
-steps = int(args['--steps'])
+steps = int(args['--window'])
+stride = int(args['--stride'])
 discard = int(args['--discard'])
 
 def autocorr(x, n=101):
-    return [_autocorr(x, k) for k in range(n)]
+    y0 = _autocorr(x, 0)
+    return [1] + [_autocorr(x, k) / y0 for k in range(1, n)]
 
 def _autocorr(x, k):
     N = len(x) - k
-    return sum(x[i+k] == x[i] for i in range(N)) / N
+    mu = sum((x.count(c) / len(x))**2 for c in 'ACGU')
+    return sum((x[i+k] == x[i]) - mu for i in range(N)) / N
 
 
-domains = 'nexus/c', 'ruler', 'hairpin/a', 'hairpin/b'
-labels = []
+seq_traj = traj['current_seq'][discard:-1:stride]
+initial_seq = seq_traj.iloc[0]
+i = 0
 
-for i, domain in enumerate(domains):
-    seq_traj = traj['current_domain[%s]' % domain][discard:]
-    initial_seq = seq_traj.iloc[0]
-    color = tango.color_from_cycle(i)
+for pos in range(len(initial_seq)):
+    # Skip positions that weren't designed.
+    if initial_seq[pos].islower():
+        i += 1
+        continue
 
-    for pos in range(len(initial_seq)):
-        pos_traj = [seq[pos] for seq in seq_traj]
-        lines = plot(autocorr(pos_traj, steps+1), color=color)
+    pos_traj = [seq[pos] for seq in seq_traj]
 
-        if pos == 0:
-            labels.append((lines[0], domain))
+    # Pick a color base on the most common nucleotide.
+    counts = {c: pos_traj.count(c) for c in 'ACGU'}
+    most_common = sorted(counts, key=lambda x: counts[x], reverse=True)[0]
+    colors = {'A': tango.orange[1], 'U': tango.orange[1], 'C': tango.blue[1], 'G': tango.blue[1]}
+
+    # Calculate and plot the auto-correlation.
+    x = arange(0, steps + stride, stride)
+    y = autocorr(pos_traj, (steps // stride) + 1)
+    lines = plot(x, y, color=colors[most_common])
+
+axhline(0, linewidth=2, color=tango.black)
 
 title(traj_name)
 xlabel("step")
 ylabel("auto-correlation")
+ylim(-0.2, 1.0)
 
-legend(*zip(*labels), loc='best')
-gcf().canvas.set_window_title('{}: {}'.format(sys.argv[0], traj_name))
+title('{}: {}'.format(sys.argv[0], traj_name))
 tight_layout()
-show()
+
+if args['--output']:
+    savefig(args['--output']);
+else:
+    gcf().canvas.set_window_title('{}: {}'.format(sys.argv[0], traj_name))
+    show()
