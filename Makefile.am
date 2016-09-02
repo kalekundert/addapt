@@ -27,12 +27,19 @@ pkginclude_HEADERS = \
 
 # Apps
 bin_PROGRAMS = \
-	addapt
+	addapt \
+	addapt_score
 
 addapt_SOURCES = \
 	apps/addapt.cc
 
 addapt_LDADD = \
+	libaddapt.la
+	
+addapt_score_SOURCES = \
+	apps/addapt_score.cc
+
+addapt_score_LDADD = \
 	libaddapt.la
 	
 # Tests
